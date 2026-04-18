@@ -1,6 +1,6 @@
 import io
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -47,8 +47,8 @@ def get_sample_template_csv() -> bytes:
             "SUBJ-101": ["A(32)"],
             "SUBJ-102": ["B(28)"],
             "SGPA": ["8.00"],
-            "SEMETER RESULT": ["PASS"],
-            "TOTAL MAR POINTS": ["0"],
+            "SEMESTER RESULT": ["PASS"],
+            "TOTAL MARK POINTS": ["0"],
         }
     )
     return sample.to_csv(index=False).encode("utf-8")
