@@ -8,6 +8,8 @@ import streamlit as st
 
 st.set_page_config(page_title="College Result Analysis", page_icon="📊", layout="wide")
 
+COLLEGE_NAME = "Kalyani Government Engineering College"
+
 REQUIRED_COLUMNS = [
     "ROLL NO",
     "NAME",
@@ -362,7 +364,7 @@ def download_table_button(df: pd.DataFrame, label: str, filename: str):
 
 
 def page_upload_and_validate():
-    st.header("Kalyani Government Engineering College")
+    st.header(COLLEGE_NAME)
     st.title("📄 Upload & Validate Dataset")
     st.download_button(
         "Download sample CSV template",
@@ -416,7 +418,7 @@ def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
 
 
 def page_course_subject_analysis():
-    st.header("Kalyani Government Engineering College")
+    st.header(COLLEGE_NAME)
     st.title("📊 Course & Subject Analysis")
 
     data = require_data()
@@ -512,7 +514,7 @@ def page_course_subject_analysis():
 
 
 def page_ranking_system():
-    st.header("Kalyani Government Engineering College")
+    st.header(COLLEGE_NAME)
     st.title("🏆 Ranking System")
 
     data = require_data()
@@ -559,7 +561,7 @@ def page_ranking_system():
 
 
 def page_student_drilldown():
-    st.header("Kalyani Government Engineering College")
+    st.header(COLLEGE_NAME)
     st.title("👤 Student Drilldown Dashboard")
 
     data = require_data()
