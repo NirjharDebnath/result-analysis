@@ -56,6 +56,8 @@ PERFORMANCE_CATEGORIES = (
     "Performing Decently",
     "Performing Poorly",
 )
+COMPLETE_PASS_LABEL = "Passed All Subjects"
+AT_LEAST_ONE_F_LABEL = "At Least One F"
 
 
 @st.cache_data
@@ -546,17 +548,23 @@ def page_course_subject_analysis():
     student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
+    performance_bins = [
+        -1,
+        PERFORMANCE_WELL_MAX_FAILS,
+        PERFORMANCE_DECENT_MAX_FAILS,
+        float("inf"),
+    ]
     student_performance["PERFORMANCE"] = pd.cut(
         student_performance["FAIL_SUBJECTS"],
-        bins=[-1, PERFORMANCE_WELL_MAX_FAILS, PERFORMANCE_DECENT_MAX_FAILS, float("inf")],
+        bins=performance_bins,
         labels=list(PERFORMANCE_CATEGORIES),
         include_lowest=True,
     ).astype(str)
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
-                "Passed All Subjects",
-                "At Least One F",
+                COMPLETE_PASS_LABEL,
+                AT_LEAST_ONE_F_LABEL,
             ],
             "COUNT": [
                 int((student_performance["FAIL_SUBJECTS"] == 0).sum()),
