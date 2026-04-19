@@ -49,10 +49,13 @@ LOGO_CANDIDATE_PATHS = [
 ]
 PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
+POOR_PERFORMANCE_LABEL = "Poor Performance"
+GOOD_PERFORMANCE_LABEL = "Good Performance"
+DECENT_PERFORMANCE_LABEL = "Decent Performance"
 PERFORMANCE_CATEGORIES = (
-    "Poor Performance",
-    "Good Performance",
-    "Decent Performance",
+    POOR_PERFORMANCE_LABEL,
+    GOOD_PERFORMANCE_LABEL,
+    DECENT_PERFORMANCE_LABEL,
 )
 COMPLETE_PASS_LABEL = "Passed All Subjects"
 AT_LEAST_ONE_F_LABEL = "At Least One F"
@@ -583,16 +586,16 @@ def page_course_subject_analysis():
     if "SGPA_VALUE" not in student_performance.columns:
         student_performance["SGPA_VALUE"] = pd.NA
 
-    student_performance["PERFORMANCE"] = PERFORMANCE_CATEGORIES[2]
+    student_performance["PERFORMANCE"] = DECENT_PERFORMANCE_LABEL
     student_performance.loc[
         student_performance["FAIL_SUBJECTS"] > 0, "PERFORMANCE"
-    ] = PERFORMANCE_CATEGORIES[0]
+    ] = POOR_PERFORMANCE_LABEL
     if good_gpa_threshold is not None:
         student_performance.loc[
             (student_performance["FAIL_SUBJECTS"] == 0)
             & (student_performance["SGPA_VALUE"] >= good_gpa_threshold),
             "PERFORMANCE",
-        ] = PERFORMANCE_CATEGORIES[1]
+        ] = GOOD_PERFORMANCE_LABEL
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
