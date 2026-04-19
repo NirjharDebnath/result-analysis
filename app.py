@@ -49,6 +49,13 @@ LOGO_CANDIDATE_PATHS = [
 ]
 PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
+PERFORMANCE_WELL_MAX_FAILS = 0
+PERFORMANCE_DECENT_MAX_FAILS = 1
+PERFORMANCE_CATEGORIES = (
+    "Performing Well",
+    "Performing Decently",
+    "Performing Poorly",
+)
 
 
 @st.cache_data
@@ -259,14 +266,6 @@ def parse_grade_value(value: object) -> Tuple[Optional[str], Optional[float]]:
         return None, float(text)
 
     return text, None
-
-
-def classify_student_performance(fail_subjects: int) -> str:
-    if fail_subjects == 0:
-        return "Performing Well"
-    if fail_subjects == 1:
-        return "Performing Decently"
-    return "Performing Poorly"
 
 
 def marks_frame(df: pd.DataFrame, subjects: List[str]) -> pd.DataFrame:
@@ -547,7 +546,12 @@ def page_course_subject_analysis():
     student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
-    student_performance["PERFORMANCE"] = student_performance["FAIL_SUBJECTS"].apply(classify_student_performance)
+    student_performance["PERFORMANCE"] = pd.cut(
+        student_performance["FAIL_SUBJECTS"],
+        bins=[-1, PERFORMANCE_WELL_MAX_FAILS, PERFORMANCE_DECENT_MAX_FAILS, float("inf")],
+        labels=list(PERFORMANCE_CATEGORIES),
+        include_lowest=True,
+    ).astype(str)
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
@@ -590,7 +594,7 @@ def page_course_subject_analysis():
     st.subheader("Student Performance Category Filter")
     selected_performance = st.selectbox(
         "Choose student performance category",
-        ["Performing Well", "Performing Decently", "Performing Poorly"],
+        list(PERFORMANCE_CATEGORIES),
     )
     selected_students = student_performance[
         student_performance["PERFORMANCE"] == selected_performance
