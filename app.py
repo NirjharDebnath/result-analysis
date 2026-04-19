@@ -571,11 +571,10 @@ def page_course_subject_analysis():
             min_sgpa = float(valid_sgpa.min())
             max_sgpa = float(valid_sgpa.max())
             default_threshold = round(float(valid_sgpa.quantile(0.75)), 2)
-            default_threshold = min(max(default_threshold, min_sgpa), max_sgpa)
             if min_sgpa == max_sgpa:
                 good_sgpa_threshold = min_sgpa
                 st.caption(
-                    f"Good performance GPA threshold fixed at {good_sgpa_threshold:.2f} (single SGPA value in this selection)."
+                    f"Good performance SGPA threshold fixed at {good_sgpa_threshold:.2f} (single SGPA value in this selection)."
                 )
             else:
                 good_sgpa_threshold = st.slider(
