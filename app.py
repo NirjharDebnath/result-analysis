@@ -43,10 +43,7 @@ SOFT_COLORS = {
 }
 LOGO_CANDIDATE_PATHS = [
     "assets/kgec_logo.png",
-    "assets/kgec-logo.png",
     "kgec_logo.png",
-    "kgec-logo.png",
-    "logo.png",
 ]
 
 
@@ -419,7 +416,7 @@ def page_upload_and_validate():
     st.header(COLLEGE_NAME)
     st.title("📄 Upload Your Result Dataset")
     st.info(
-        "Start here: upload your result file, validate it, and then use the sidebar to open Insights, Rankings, or Student Performance."
+        "Start here: upload your result file, validate it, and then use the sidebar to open Course & Subject Insights, Student Rankings, or Student Performance Dashboard."
     )
     with st.expander("How to use this app", expanded=False):
         st.markdown(
