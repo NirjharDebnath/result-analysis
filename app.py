@@ -1,5 +1,6 @@
 import io
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -34,6 +35,16 @@ KNOWN_NON_SUBJECT_COLUMNS = {
 }
 
 PASSING_GRADES = {"O", "E", "A", "B", "C", "D", "P", "S"}
+SOFT_COLORS = {
+    "pass": "#6BBF9F",
+    "fail": "#E5989B",
+    "primary": "#8AB6D6",
+    "grid": "#D9E3F0",
+}
+LOGO_CANDIDATE_PATHS = [
+    "assets/kgec_logo.png",
+    "kgec_logo.png",
+]
 
 
 @st.cache_data
@@ -293,7 +304,7 @@ def read_uploaded_dataset(uploaded_file) -> pd.DataFrame:
     elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
         raw_df = pd.read_excel(uploaded_file, dtype=str, header=None)
     else:
-        raise ValueError("Unsupported file format. Please upload CSV or XLSX.")
+        raise ValueError("Unsupported file format. Please upload CSV, XLS, or XLSX.")
 
     parsed_df = parse_multisection_rows(raw_df)
     if parsed_df.empty:
@@ -340,6 +351,7 @@ def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key:
 
 
 def downloadable_plot(fig, filename: str):
+    fig.tight_layout()
     st.pyplot(fig, use_container_width=True)
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", bbox_inches="tight", dpi=150)
@@ -363,9 +375,59 @@ def download_table_button(df: pd.DataFrame, label: str, filename: str):
     )
 
 
+def resolve_logo_path() -> Optional[str]:
+    base_path = Path(__file__).resolve().parent
+    for relative_path in LOGO_CANDIDATE_PATHS:
+        logo_path = base_path / relative_path
+        if logo_path.exists():
+            return str(logo_path)
+    return None
+
+
+def render_sidebar_branding():
+    logo_path = resolve_logo_path()
+    if logo_path:
+        st.sidebar.image(logo_path, width=120)
+    st.sidebar.markdown("**Kalyani Government Engineering College**")
+
+
+def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, rotate_x: int = 0):
+    ax.set_facecolor("#F8FAFC")
+    ax.grid(axis="y", linestyle="--", alpha=0.35, color=SOFT_COLORS["grid"])
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize=10, fontweight="semibold")
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=10, fontweight="semibold")
+    ax.tick_params(axis="x", labelsize=9)
+    ax.tick_params(axis="y", labelsize=9)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(rotate_x)
+        tick.set_ha("right" if rotate_x else "center")
+
+
+def render_footer():
+    st.markdown("---")
+    st.caption(
+        "© Designed by Nirjhar Debnath, Dept of CSE, Kalyani Government Engineering College."
+    )
+
+
 def page_upload_and_validate():
     st.header(COLLEGE_NAME)
-    st.title("📄 Upload & Validate Dataset")
+    st.title("📄 Upload Your Result Dataset")
+    st.info(
+        "Start here: upload your result file, validate it, and then use the sidebar to open Course & Subject Insights, Student Rankings, or Student Performance Dashboard."
+    )
+    with st.expander("How to use this app", expanded=False):
+        st.markdown(
+            """
+            1. Upload a **CSV/XLS/XLSX** result file.  
+            2. Confirm successful validation and review detected columns.  
+            3. Open **Course & Subject Insights** for trends and charts.  
+            4. Open **Student Rankings** for merit lists.  
+            5. Open **Student Performance Dashboard** for student-level details.
+            """
+        )
     st.download_button(
         "Download sample CSV template",
         data=get_sample_template_csv(),
@@ -373,15 +435,17 @@ def page_upload_and_validate():
         mime="text/csv",
     )
 
-    uploaded_file = st.file_uploader("Upload result file", type=["csv", "xlsx"])
+    uploaded_file = st.file_uploader("Upload result file", type=["csv", "xls", "xlsx"])
     if not uploaded_file:
-        st.info("Upload a CSV or XLSX file to begin analysis.")
+        st.info("Upload a CSV, XLS, or XLSX file to begin analysis.")
         return
 
     try:
         df = read_uploaded_dataset(uploaded_file)
     except Exception as exc:
-        st.error(f"Unable to read uploaded file. Please upload a valid CSV/XLSX with section headers. Details: {exc}")
+        st.error(
+            f"Unable to read uploaded file. Please upload a valid CSV/XLS/XLSX with section headers. Details: {exc}"
+        )
         return
 
     errors, metadata_cols, subject_cols = validate_dataset(df)
@@ -393,6 +457,9 @@ def page_upload_and_validate():
         return
 
     st.success("Dataset validated successfully.")
+    st.caption(
+        "Next step: choose a page from the left sidebar to explore insights, rankings, or student-level performance."
+    )
     st.session_state["validated_df"] = df
     st.session_state["subject_cols"] = subject_cols
 
@@ -419,7 +486,7 @@ def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
 
 def page_course_subject_analysis():
     st.header(COLLEGE_NAME)
-    st.title("📊 Course & Subject Analysis")
+    st.title("📊 Course & Subject Insights")
 
     data = require_data()
     if data is None:
@@ -460,8 +527,9 @@ def page_course_subject_analysis():
     col3.metric("Fail Entries", int(pass_fail.loc[pass_fail["STATUS"] == "Fail", "COUNT"].sum()))
 
     fig1, ax1 = plt.subplots(figsize=(5, 3.5))
-    ax1.bar(pass_fail["STATUS"], pass_fail["COUNT"], color=["#2ca02c", "#d62728"])
+    ax1.bar(pass_fail["STATUS"], pass_fail["COUNT"], color=[SOFT_COLORS["pass"], SOFT_COLORS["fail"]])
     ax1.set_title("Pass vs Fail Count")
+    style_axis(ax1, xlabel="Result Status", ylabel="Count")
     downloadable_plot(fig1, "pass_vs_fail.png")
 
     failure_details = (
@@ -480,10 +548,9 @@ def page_course_subject_analysis():
         sgpa_series = pd.to_numeric(filtered_df[sgpa_col], errors="coerce").dropna()
         if not sgpa_series.empty:
             fig2, ax2 = plt.subplots(figsize=(7, 3.5))
-            ax2.hist(sgpa_series, bins=min(10, max(3, sgpa_series.nunique())), color="#1f77b4")
+            ax2.hist(sgpa_series, bins=min(10, max(3, sgpa_series.nunique())), color=SOFT_COLORS["primary"])
             ax2.set_title(f"{sgpa_col} Distribution")
-            ax2.set_xlabel(sgpa_col)
-            ax2.set_ylabel("Count")
+            style_axis(ax2, xlabel=sgpa_col, ylabel="Count")
             downloadable_plot(fig2, "sgpa_distribution.png")
 
     marks_numeric = long_df.dropna(subset=["MARKS"]).copy()
@@ -504,18 +571,19 @@ def page_course_subject_analysis():
         st.dataframe(topper_lowest, use_container_width=True)
         download_table_button(topper_lowest, "Download topper vs lowest", "topper_vs_lowest.csv")
 
-        fig3, ax3 = plt.subplots(figsize=(7, 3.8))
+        subject_count = marks_numeric["SUBJECT"].nunique()
+        fig3_width = min(16, max(8, subject_count * 0.65))
+        fig3, ax3 = plt.subplots(figsize=(fig3_width, 4.2))
         marks_numeric.boxplot(column="MARKS", by="SUBJECT", ax=ax3)
         ax3.set_title("Marks Distribution by Subject")
-        ax3.set_xlabel("Subject")
-        ax3.set_ylabel("Marks")
+        style_axis(ax3, xlabel="Subject", ylabel="Marks", rotate_x=45)
         plt.suptitle("")
         downloadable_plot(fig3, "subject_boxplot.png")
 
 
 def page_ranking_system():
     st.header(COLLEGE_NAME)
-    st.title("🏆 Ranking System")
+    st.title("🏆 Student Rankings")
 
     data = require_data()
     if data is None:
@@ -562,7 +630,7 @@ def page_ranking_system():
 
 def page_student_drilldown():
     st.header(COLLEGE_NAME)
-    st.title("👤 Student Drilldown Dashboard")
+    st.title("👤 Student Performance Dashboard")
 
     data = require_data()
     if data is None:
@@ -640,21 +708,25 @@ def page_student_drilldown():
     )
 
 
+render_sidebar_branding()
+
 page = st.sidebar.radio(
     "Navigate",
     [
-        "Upload & Validate Dataset",
-        "Course & Subject Analysis",
-        "Ranking System",
-        "Student Drilldown Dashboard",
+        "Upload Result Dataset",
+        "Course & Subject Insights",
+        "Student Rankings",
+        "Student Performance Dashboard",
     ],
 )
 
-if page == "Upload & Validate Dataset":
+if page == "Upload Result Dataset":
     page_upload_and_validate()
-elif page == "Course & Subject Analysis":
+elif page == "Course & Subject Insights":
     page_course_subject_analysis()
-elif page == "Ranking System":
+elif page == "Student Rankings":
     page_ranking_system()
 else:
     page_student_drilldown()
+
+render_footer()
