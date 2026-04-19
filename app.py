@@ -11,9 +11,6 @@ st.set_page_config(page_title="College Result Analysis", page_icon="📊", layou
 REQUIRED_COLUMNS = [
     "ROLL NO",
     "NAME",
-    "COLLEGE NAME",
-    "SEMESTER",
-    "COURSE CODE",
     "COURSENAME",
 ]
 
@@ -29,6 +26,9 @@ KNOWN_NON_SUBJECT_COLUMNS = {
     "SEMESTER RESULT",
     "TOTAL MAR POINTS",
     "TOTAL MARK POINTS",
+    "STREAM",
+    "BRANCH",
+    "SPECIALIZATION",
 }
 
 PASSING_GRADES = {"O", "E", "A", "B", "C", "D", "P", "S"}
@@ -63,12 +63,135 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def normalize_token(text: object) -> str:
+    if pd.isna(text):
+        return ""
+    return re.sub(r"[^A-Z0-9]+", "", str(text).strip().upper())
+
+
+def canonicalize_header(value: object) -> Optional[str]:
+    text = "" if pd.isna(value) else str(value).strip().upper()
+    if not text:
+        return None
+    token = normalize_token(text)
+
+    if token in {"ROLL", "ROLLNO", "ROLLNUMBER", "ROLLNUM"}:
+        return "ROLL NO"
+    if token in {"NAME", "STUDENTNAME"}:
+        return "NAME"
+    if token in {"COLLEGENAME", "INSTITUTENAME"}:
+        return "COLLEGE NAME"
+    if token in {"SEMESTER", "SEM"}:
+        return "SEMESTER"
+    if token in {"COURSECODE", "COURSEID"}:
+        return "COURSE CODE"
+    if token in {"COURSE", "COURSENAME", "PROGRAMME", "PROGRAM", "DEPARTMENT"}:
+        return "COURSENAME"
+    if token in {"STREAM", "BRANCH", "SPECIALIZATION", "SPECIALISATION"}:
+        return "STREAM"
+    if "SGPA" in token or token == "GPA":
+        return "SGPA"
+    if "RESULT" in token and ("SEM" in token or "SEME" in token):
+        return "SEMESTER RESULT"
+    if token in {"PASSFAIL", "RESULT"}:
+        return "SEMESTER RESULT"
+    if "MARPOINT" in token or "MARKPOINT" in token:
+        return "TOTAL MARK POINTS"
+    return text
+
+
+def is_section_header_row(cells: List[str]) -> bool:
+    tokens = [normalize_token(v) for v in cells if str(v).strip()]
+    if not tokens:
+        return False
+    has_roll = any(t in {"ROLL", "ROLLNO", "ROLLNUMBER", "ROLLNUM"} for t in tokens)
+    has_name = any(t in {"NAME", "STUDENTNAME"} for t in tokens)
+    has_course = any(
+        t.startswith("COURSE") or t in {"COURSENAME", "STREAM", "BRANCH", "PROGRAMME", "PROGRAM"}
+        for t in tokens
+    )
+    return has_roll and has_name and has_course
+
+
+def parse_multisection_rows(raw_df: pd.DataFrame) -> pd.DataFrame:
+    rows = raw_df.fillna("").astype(str).values.tolist()
+    current_header: Dict[int, str] = {}
+    records: List[Dict[str, str]] = []
+
+    for row in rows:
+        cells = [str(v).strip() for v in row]
+        if not any(cells):
+            continue
+
+        if is_section_header_row(cells):
+            mapped: Dict[int, str] = {}
+            seen_subjects: Dict[str, int] = {}
+            for idx, cell in enumerate(cells):
+                col = canonicalize_header(cell)
+                if not col:
+                    continue
+                if col in KNOWN_NON_SUBJECT_COLUMNS:
+                    if col not in mapped.values():
+                        mapped[idx] = col
+                else:
+                    seen_subjects[col] = seen_subjects.get(col, 0) + 1
+                    mapped[idx] = col if seen_subjects[col] == 1 else f"{col} ({seen_subjects[col]})"
+            current_header = mapped
+            continue
+
+        if not current_header:
+            continue
+
+        record: Dict[str, str] = {}
+        for idx, col in current_header.items():
+            if idx < len(cells) and cells[idx] != "":
+                record[col] = cells[idx]
+
+        roll_no = str(record.get("ROLL NO", "")).strip().upper()
+        if not record or roll_no in {"", "ROLL NO"}:
+            continue
+        records.append(record)
+
+    parsed_df = pd.DataFrame(records)
+    if parsed_df.empty:
+        return parsed_df
+
+    if "COURSE" in parsed_df.columns and "COURSENAME" not in parsed_df.columns:
+        parsed_df = parsed_df.rename(columns={"COURSE": "COURSENAME"})
+
+    for col, default_val in {
+        "COLLEGE NAME": "",
+        "SEMESTER": "UNKNOWN",
+        "COURSE CODE": "",
+    }.items():
+        if col not in parsed_df.columns:
+            parsed_df[col] = default_val
+    return parsed_df
+
+
 def clean_uploaded_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if "ROLL NO" in df.columns:
         roll_series = df["ROLL NO"].astype(str).str.strip().str.upper()
         df = df[roll_series != "ROLL NO"]
     return df.dropna(how="all").reset_index(drop=True)
+
+
+def is_metadata_column(col: str) -> bool:
+    token = normalize_token(col)
+    if col in KNOWN_NON_SUBJECT_COLUMNS:
+        return True
+    if token.startswith("ROLL") or token == "NAME":
+        return True
+    if "COURSE" in token or "COLLEGE" in token:
+        return True
+    if "SEM" in token and "RESULT" in token:
+        return True
+    if token in {"SEM", "SEMESTER", "SGPA", "GPA", "PASSFAIL", "RESULT"}:
+        return True
+    if "MARKPOINT" in token or "MARPOINT" in token:
+        return True
+    return False
 
 
 def validate_dataset(df: pd.DataFrame) -> Tuple[List[str], List[str], List[str]]:
@@ -85,8 +208,9 @@ def validate_dataset(df: pd.DataFrame) -> Tuple[List[str], List[str], List[str]]
     if "NAME" in df.columns and df["NAME"].astype(str).str.strip().eq("").all():
         errors.append("NAME appears empty for all rows.")
 
-    metadata_cols = [c for c in df.columns if c in KNOWN_NON_SUBJECT_COLUMNS]
-    subject_cols = [c for c in df.columns if c not in KNOWN_NON_SUBJECT_COLUMNS]
+    metadata_cols = [c for c in df.columns if is_metadata_column(c)]
+    subject_cols = [c for c in df.columns if not is_metadata_column(c)]
+    subject_cols = [c for c in subject_cols if df[c].astype(str).str.strip().ne("").any()]
 
     if not subject_cols:
         errors.append(
@@ -153,10 +277,64 @@ def marks_frame(df: pd.DataFrame, subjects: List[str]) -> pd.DataFrame:
 
 
 def get_sgpa_column(df: pd.DataFrame) -> Optional[str]:
-    for c in ["SGPA", "GPA"]:
-        if c in df.columns:
+    for c in df.columns:
+        token = normalize_token(c)
+        if "SGPA" in token or token == "GPA":
             return c
     return None
+
+
+def read_uploaded_dataset(uploaded_file) -> pd.DataFrame:
+    file_name = uploaded_file.name.lower()
+    if file_name.endswith(".csv"):
+        raw_df = pd.read_csv(uploaded_file, dtype=str, header=None)
+    elif file_name.endswith(".xlsx"):
+        raw_df = pd.read_excel(uploaded_file, dtype=str, header=None)
+    else:
+        raise ValueError("Unsupported file format. Please upload CSV or XLSX.")
+
+    parsed_df = parse_multisection_rows(raw_df)
+    if parsed_df.empty:
+        raise ValueError(
+            "No valid student rows found. Ensure each section starts with a header like Roll/Name/Course."
+        )
+    return clean_uploaded_data(normalize_columns(parsed_df))
+
+
+def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
+    courses = sorted(
+        df["COURSENAME"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .replace("", pd.NA)
+        .dropna()
+        .unique()
+        .tolist()
+    )
+    selected_course = st.selectbox(course_label, courses, key=course_key)
+    filtered = df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
+
+    stream_col = next(
+        (c for c in ["STREAM", "BRANCH", "SPECIALIZATION"] if c in filtered.columns),
+        None,
+    )
+    if stream_col:
+        stream_options = sorted(
+            filtered[stream_col]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        if stream_options:
+            selected_stream = st.selectbox(f"Select {stream_col.title()}", stream_options, key=f"{course_key}_stream")
+            filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
+
+    return filtered
 
 
 def downloadable_plot(fig, filename: str):
@@ -184,6 +362,7 @@ def download_table_button(df: pd.DataFrame, label: str, filename: str):
 
 
 def page_upload_and_validate():
+    st.header("Kalyani Government Engineering College")
     st.title("📄 Upload & Validate Dataset")
     st.download_button(
         "Download sample CSV template",
@@ -192,16 +371,15 @@ def page_upload_and_validate():
         mime="text/csv",
     )
 
-    uploaded_file = st.file_uploader("Upload result CSV", type=["csv"])
+    uploaded_file = st.file_uploader("Upload result file", type=["csv", "xlsx"])
     if not uploaded_file:
-        st.info("Upload a CSV to begin analysis.")
+        st.info("Upload a CSV or XLSX file to begin analysis.")
         return
 
     try:
-        raw_df = pd.read_csv(uploaded_file, dtype=str)
-        df = clean_uploaded_data(normalize_columns(raw_df))
+        df = read_uploaded_dataset(uploaded_file)
     except Exception as exc:
-        st.error(f"Unable to read CSV. Please upload a valid CSV file. Details: {exc}")
+        st.error(f"Unable to read uploaded file. Please upload a valid CSV/XLSX with section headers. Details: {exc}")
         return
 
     errors, metadata_cols, subject_cols = validate_dataset(df)
@@ -238,6 +416,7 @@ def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
 
 
 def page_course_subject_analysis():
+    st.header("Kalyani Government Engineering College")
     st.title("📊 Course & Subject Analysis")
 
     data = require_data()
@@ -245,13 +424,10 @@ def page_course_subject_analysis():
         return
     df, subject_cols = data
 
-    courses = sorted(df["COURSENAME"].dropna().astype(str).unique().tolist())
-    selected_course = st.selectbox("Select Course", courses)
-
-    course_df = df[df["COURSENAME"].astype(str) == str(selected_course)].copy()
+    course_df = apply_course_stream_filters(df, "Select Course", "course_analysis")
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.selectbox("Select Semester", semesters)
-    filtered_df = course_df[course_df["SEMESTER"].astype(str) == str(selected_semester)].copy()
+    filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
 
     available_subjects = [
         c
@@ -336,6 +512,7 @@ def page_course_subject_analysis():
 
 
 def page_ranking_system():
+    st.header("Kalyani Government Engineering College")
     st.title("🏆 Ranking System")
 
     data = require_data()
@@ -343,13 +520,10 @@ def page_ranking_system():
         return
     df, subject_cols = data
 
-    courses = sorted(df["COURSENAME"].dropna().astype(str).unique().tolist())
-    selected_course = st.selectbox("Select Course", courses, key="rank_course")
-
-    course_df = df[df["COURSENAME"].astype(str) == str(selected_course)].copy()
+    course_df = apply_course_stream_filters(df, "Select Course", "rank_course")
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.selectbox("Select Semester", semesters, key="rank_sem")
-    filtered_df = course_df[course_df["SEMESTER"].astype(str) == str(selected_semester)].copy()
+    filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
 
     ranking_mode = st.radio("Ranking Basis", ["Overall GPA/Marks", "By Subject"], horizontal=True)
     rank_type = st.selectbox("Ranking Type", ["Standard", "Dense"])
@@ -385,6 +559,7 @@ def page_ranking_system():
 
 
 def page_student_drilldown():
+    st.header("Kalyani Government Engineering College")
     st.title("👤 Student Drilldown Dashboard")
 
     data = require_data()
@@ -392,9 +567,7 @@ def page_student_drilldown():
         return
     df, subject_cols = data
 
-    courses = sorted(df["COURSENAME"].dropna().astype(str).unique().tolist())
-    selected_course = st.selectbox("Select Course", courses, key="student_course")
-    course_df = df[df["COURSENAME"].astype(str) == str(selected_course)].copy()
+    course_df = apply_course_stream_filters(df, "Select Course", "student_course")
 
     student_options = (
         course_df[["ROLL NO", "NAME"]]
@@ -429,7 +602,7 @@ def page_student_drilldown():
 
     subject_rows = []
     backlog_count = 0
-    for subject in [c for c in subject_cols if c in course_df.columns]:
+    for subject in [c for c in subject_cols if c in course_df.columns and course_df[c].notna().any()]:
         grade, marks = parse_grade_value(sr.get(subject))
         if grade == "F":
             status = "Fail"
