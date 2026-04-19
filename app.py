@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="College Result Analysis", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Result Analysis", page_icon="📊", layout="wide")
 
 COLLEGE_NAME = "Kalyani Government Engineering College"
 
