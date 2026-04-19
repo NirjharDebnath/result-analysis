@@ -51,6 +51,7 @@ PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
 PERFORMANCE_WELL_MAX_FAILS = 0
 PERFORMANCE_DECENT_MAX_FAILS = 1
+PERFORMANCE_BIN_LOWER_BOUND = -1
 PERFORMANCE_CATEGORIES = (
     "Performing Well",
     "Performing Decently",
@@ -58,6 +59,8 @@ PERFORMANCE_CATEGORIES = (
 )
 COMPLETE_PASS_LABEL = "Passed All Subjects"
 AT_LEAST_ONE_F_LABEL = "At Least One F"
+STUDENT_PERFORMANCE_SORT_COLUMNS = ["FAIL_SUBJECTS", "PASS_SUBJECTS", "NAME"]
+STUDENT_PERFORMANCE_SORT_ASCENDING = [True, False, True]
 
 
 @st.cache_data
@@ -549,7 +552,7 @@ def page_course_subject_analysis():
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
     performance_bins = [
-        -1,
+        PERFORMANCE_BIN_LOWER_BOUND,
         PERFORMANCE_WELL_MAX_FAILS,
         PERFORMANCE_DECENT_MAX_FAILS,
         float("inf"),
@@ -608,8 +611,8 @@ def page_course_subject_analysis():
         student_performance["PERFORMANCE"] == selected_performance
     ]
     selected_students = selected_students.sort_values(
-        by=["FAIL_SUBJECTS", "PASS_SUBJECTS", "NAME"],
-        ascending=[True, False, True],
+        by=STUDENT_PERFORMANCE_SORT_COLUMNS,
+        ascending=STUDENT_PERFORMANCE_SORT_ASCENDING,
     )
     st.dataframe(selected_students, use_container_width=True)
     download_table_button(
