@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -49,13 +50,13 @@ LOGO_CANDIDATE_PATHS = [
 ]
 PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
-PERFORMANCE_WELL_MAX_FAILS = 0
-PERFORMANCE_DECENT_MAX_FAILS = 1
-PERFORMANCE_BINS_MIN = float("-inf")
+POOR_PERFORMANCE_LABEL = "Poor Performance"
+GOOD_PERFORMANCE_LABEL = "Good Performance"
+DECENT_PERFORMANCE_LABEL = "Decent Performance"
 PERFORMANCE_CATEGORIES = (
-    "Performing Well",
-    "Performing Decently",
-    "Performing Poorly",
+    POOR_PERFORMANCE_LABEL,
+    GOOD_PERFORMANCE_LABEL,
+    DECENT_PERFORMANCE_LABEL,
 )
 COMPLETE_PASS_LABEL = "Passed All Subjects"
 AT_LEAST_ONE_F_LABEL = "At Least One F"
@@ -551,17 +552,58 @@ def page_course_subject_analysis():
     student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
-    performance_bins = [
-        PERFORMANCE_BINS_MIN,
-        PERFORMANCE_WELL_MAX_FAILS,
-        PERFORMANCE_DECENT_MAX_FAILS,
-        float("inf"),
-    ]
-    student_performance["PERFORMANCE"] = pd.cut(
-        student_performance["FAIL_SUBJECTS"],
-        bins=performance_bins,
-        labels=PERFORMANCE_CATEGORIES,
-        include_lowest=True,
+    sgpa_col = get_sgpa_column(filtered_df)
+    good_sgpa_threshold = None
+    if sgpa_col:
+        sgpa_by_student = (
+            filtered_df[["ROLL NO", "NAME", sgpa_col]]
+            .drop_duplicates(subset=["ROLL NO", "NAME"])
+            .rename(columns={sgpa_col: "SGPA_VALUE"})
+        )
+        sgpa_by_student["SGPA_VALUE"] = pd.to_numeric(
+            sgpa_by_student["SGPA_VALUE"], errors="coerce"
+        )
+        student_performance = student_performance.merge(
+            sgpa_by_student, on=["ROLL NO", "NAME"], how="left"
+        )
+        valid_sgpa = student_performance["SGPA_VALUE"].dropna()
+        if not valid_sgpa.empty:
+            min_sgpa = float(valid_sgpa.min())
+            max_sgpa = float(valid_sgpa.max())
+            default_threshold = round(float(valid_sgpa.quantile(0.75)), 2)
+            if min_sgpa == max_sgpa:
+                good_sgpa_threshold = min_sgpa
+                st.caption(
+                    f"Good performance SGPA threshold fixed at {good_sgpa_threshold:.2f} (single SGPA value in this selection)."
+                )
+            else:
+                good_sgpa_threshold = st.slider(
+                    "Minimum SGPA for Good Performance",
+                    min_value=min_sgpa,
+                    max_value=max_sgpa,
+                    value=default_threshold,
+                    step=0.1,
+                )
+    if "SGPA_VALUE" not in student_performance.columns:
+        student_performance["SGPA_VALUE"] = pd.NA
+
+    poor_performance_mask = student_performance["FAIL_SUBJECTS"] > 0
+    performance_conditions = [poor_performance_mask]
+    performance_choices = [POOR_PERFORMANCE_LABEL]
+    if good_sgpa_threshold is not None:
+        good_performance_mask = (
+            (student_performance["FAIL_SUBJECTS"] == 0)
+            & (student_performance["SGPA_VALUE"] >= good_sgpa_threshold)
+        )
+        performance_conditions.append(good_performance_mask)
+        performance_choices.append(GOOD_PERFORMANCE_LABEL)
+    student_performance["PERFORMANCE"] = pd.Categorical(
+        np.select(
+            performance_conditions,
+            performance_choices,
+            default=DECENT_PERFORMANCE_LABEL,
+        ),
+        categories=list(PERFORMANCE_CATEGORIES),
     )
     complete_pass_vs_backlog = pd.DataFrame(
         {
@@ -632,7 +674,6 @@ def page_course_subject_analysis():
     st.dataframe(failure_details, use_container_width=True)
     download_table_button(failure_details, "Download failure details", "subject_failure_details.csv")
 
-    sgpa_col = get_sgpa_column(filtered_df)
     if sgpa_col:
         sgpa_series = pd.to_numeric(filtered_df[sgpa_col], errors="coerce").dropna()
         if not sgpa_series.empty:
