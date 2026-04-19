@@ -47,6 +47,8 @@ LOGO_CANDIDATE_PATHS = [
     "assets/kgec_logo.png",
     "kgec_logo.png",
 ]
+PASS_FAIL_CHART_SIZE = (5, 3.5)
+STUDENT_STATUS_CHART_SIZE = (6, 3.5)
 
 
 @st.cache_data
@@ -257,6 +259,14 @@ def parse_grade_value(value: object) -> Tuple[Optional[str], Optional[float]]:
         return None, float(text)
 
     return text, None
+
+
+def classify_student_performance(fail_subjects: int) -> str:
+    if fail_subjects == 0:
+        return "Performing Well"
+    if fail_subjects == 1:
+        return "Performing Decently"
+    return "Performing Poorly"
 
 
 def marks_frame(df: pd.DataFrame, subjects: List[str]) -> pd.DataFrame:
@@ -537,9 +547,7 @@ def page_course_subject_analysis():
     student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
-    student_performance["PERFORMANCE"] = student_performance["FAIL_SUBJECTS"].apply(
-        lambda x: "Performing Well" if x == 0 else ("Performing Decently" if x == 1 else "Performing Poorly")
-    )
+    student_performance["PERFORMANCE"] = student_performance["FAIL_SUBJECTS"].apply(classify_student_performance)
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
@@ -560,7 +568,7 @@ def page_course_subject_analysis():
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
-        fig1, ax1 = plt.subplots(figsize=(5, 3.5))
+        fig1, ax1 = plt.subplots(figsize=PASS_FAIL_CHART_SIZE)
         bars1 = ax1.bar(pass_fail["STATUS"], pass_fail["COUNT"], color=[SOFT_COLORS["pass"], SOFT_COLORS["fail"]])
         ax1.bar_label(bars1, padding=3, fontsize=9)
         ax1.set_title("Pass vs Fail Count")
@@ -568,7 +576,7 @@ def page_course_subject_analysis():
         downloadable_plot(fig1, "pass_vs_fail.png")
 
     with chart_col2:
-        fig1b, ax1b = plt.subplots(figsize=(6.2, 3.5))
+        fig1b, ax1b = plt.subplots(figsize=STUDENT_STATUS_CHART_SIZE)
         bars1b = ax1b.bar(
             complete_pass_vs_backlog["CATEGORY"],
             complete_pass_vs_backlog["COUNT"],
@@ -586,7 +594,11 @@ def page_course_subject_analysis():
     )
     selected_students = student_performance[
         student_performance["PERFORMANCE"] == selected_performance
-    ].sort_values(["FAIL_SUBJECTS", "PASS_SUBJECTS", "NAME"], ascending=[True, False, True])
+    ]
+    selected_students = selected_students.sort_values(
+        by=["FAIL_SUBJECTS", "PASS_SUBJECTS", "NAME"],
+        ascending=[True, False, True],
+    )
     st.dataframe(selected_students, use_container_width=True)
     download_table_button(
         selected_students,
