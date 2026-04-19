@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -586,16 +587,21 @@ def page_course_subject_analysis():
     if "SGPA_VALUE" not in student_performance.columns:
         student_performance["SGPA_VALUE"] = pd.NA
 
-    student_performance["PERFORMANCE"] = DECENT_PERFORMANCE_LABEL
-    student_performance.loc[
-        student_performance["FAIL_SUBJECTS"] > 0, "PERFORMANCE"
-    ] = POOR_PERFORMANCE_LABEL
+    poor_performance_mask = student_performance["FAIL_SUBJECTS"] > 0
+    good_performance_mask = pd.Series(False, index=student_performance.index)
     if good_gpa_threshold is not None:
-        student_performance.loc[
+        good_performance_mask = (
             (student_performance["FAIL_SUBJECTS"] == 0)
-            & (student_performance["SGPA_VALUE"] >= good_gpa_threshold),
-            "PERFORMANCE",
-        ] = GOOD_PERFORMANCE_LABEL
+            & (student_performance["SGPA_VALUE"] >= good_gpa_threshold)
+        )
+    student_performance["PERFORMANCE"] = pd.Categorical(
+        np.select(
+            [poor_performance_mask, good_performance_mask],
+            [POOR_PERFORMANCE_LABEL, GOOD_PERFORMANCE_LABEL],
+            default=DECENT_PERFORMANCE_LABEL,
+        ),
+        categories=list(PERFORMANCE_CATEGORIES),
+    )
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
