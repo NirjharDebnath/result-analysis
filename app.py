@@ -553,7 +553,7 @@ def page_course_subject_analysis():
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
     sgpa_col = get_sgpa_column(filtered_df)
-    good_gpa_threshold = None
+    good_sgpa_threshold = None
     if sgpa_col:
         sgpa_by_student = (
             filtered_df[["ROLL NO", "NAME", sgpa_col]]
@@ -570,14 +570,15 @@ def page_course_subject_analysis():
         if not valid_sgpa.empty:
             min_sgpa = float(valid_sgpa.min())
             max_sgpa = float(valid_sgpa.max())
-            default_threshold = round((min_sgpa + max_sgpa) / 2, 2)
+            default_threshold = round(float(valid_sgpa.quantile(0.75)), 2)
+            default_threshold = min(max(default_threshold, min_sgpa), max_sgpa)
             if min_sgpa == max_sgpa:
-                good_gpa_threshold = min_sgpa
+                good_sgpa_threshold = min_sgpa
                 st.caption(
-                    f"Good performance GPA threshold fixed at {good_gpa_threshold:.2f} (single SGPA value in this selection)."
+                    f"Good performance GPA threshold fixed at {good_sgpa_threshold:.2f} (single SGPA value in this selection)."
                 )
             else:
-                good_gpa_threshold = st.slider(
+                good_sgpa_threshold = st.slider(
                     "Minimum SGPA for Good Performance",
                     min_value=min_sgpa,
                     max_value=max_sgpa,
@@ -590,10 +591,10 @@ def page_course_subject_analysis():
     poor_performance_mask = student_performance["FAIL_SUBJECTS"] > 0
     performance_conditions = [poor_performance_mask]
     performance_choices = [POOR_PERFORMANCE_LABEL]
-    if good_gpa_threshold is not None:
+    if good_sgpa_threshold is not None:
         good_performance_mask = (
             (student_performance["FAIL_SUBJECTS"] == 0)
-            & (student_performance["SGPA_VALUE"] >= good_gpa_threshold)
+            & (student_performance["SGPA_VALUE"] >= good_sgpa_threshold)
         )
         performance_conditions.append(good_performance_mask)
         performance_choices.append(GOOD_PERFORMANCE_LABEL)
