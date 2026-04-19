@@ -537,8 +537,8 @@ def page_course_subject_analysis():
         long_df[long_df["STATUS"].isin(["Pass", "Fail"])]
         .groupby(["ROLL NO", "NAME"], as_index=False)
         .agg(
-            PASS_SUBJECTS=("STATUS", lambda s: int((s == "Pass").sum())),
-            FAIL_SUBJECTS=("STATUS", lambda s: int((s == "Fail").sum())),
+            PASS_SUBJECTS=("STATUS", lambda s: (s == "Pass").sum()),
+            FAIL_SUBJECTS=("STATUS", lambda s: (s == "Fail").sum()),
         )
     )
     if student_performance.empty:
@@ -567,8 +567,8 @@ def page_course_subject_analysis():
                 AT_LEAST_ONE_F_LABEL,
             ],
             "COUNT": [
-                int((student_performance["FAIL_SUBJECTS"] == 0).sum()),
-                int((student_performance["FAIL_SUBJECTS"] > 0).sum()),
+                (student_performance["FAIL_SUBJECTS"] == 0).sum(),
+                (student_performance["FAIL_SUBJECTS"] > 0).sum(),
             ],
         }
     )
