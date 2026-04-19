@@ -36,15 +36,31 @@ KNOWN_NON_SUBJECT_COLUMNS = {
 
 PASSING_GRADES = {"O", "E", "A", "B", "C", "D", "P", "S"}
 SOFT_COLORS = {
-    "pass": "#6BBF9F",
-    "fail": "#E5989B",
-    "primary": "#8AB6D6",
-    "grid": "#D9E3F0",
+    "pass": "#9ECF9B",
+    "fail": "#E7A7A7",
+    "primary": "#A7C7E7",
+    "grid": "#E6DCCF",
+    "accent": "#E5B97A",
+    "bg": "#FFF9F2",
 }
 LOGO_CANDIDATE_PATHS = [
     "assets/kgec_logo.png",
     "kgec_logo.png",
 ]
+PASS_FAIL_CHART_SIZE = (5, 3.5)
+STUDENT_STATUS_CHART_SIZE = (6, 3.5)
+PERFORMANCE_WELL_MAX_FAILS = 0
+PERFORMANCE_DECENT_MAX_FAILS = 1
+PERFORMANCE_BINS_MIN = float("-inf")
+PERFORMANCE_CATEGORIES = (
+    "Performing Well",
+    "Performing Decently",
+    "Performing Poorly",
+)
+COMPLETE_PASS_LABEL = "Passed All Subjects"
+AT_LEAST_ONE_F_LABEL = "At Least One F"
+STUDENT_PERFORMANCE_SORT_COLUMNS = ["FAIL_SUBJECTS", "PASS_SUBJECTS", "NAME"]
+STUDENT_PERFORMANCE_SORT_ASCENDING = [True, False, True]
 
 
 @st.cache_data
@@ -392,7 +408,7 @@ def render_sidebar_branding():
 
 
 def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, rotate_x: int = 0):
-    ax.set_facecolor("#F8FAFC")
+    ax.set_facecolor(SOFT_COLORS["bg"])
     ax.grid(axis="y", linestyle="--", alpha=0.35, color=SOFT_COLORS["grid"])
     if xlabel:
         ax.set_xlabel(xlabel, fontsize=10, fontweight="semibold")
@@ -520,17 +536,90 @@ def page_course_subject_analysis():
         .reindex(["Pass", "Fail"], fill_value=0)
         .reset_index(name="COUNT")
     )
+    student_performance = (
+        long_df[long_df["STATUS"].isin(["Pass", "Fail"])]
+        .groupby(["ROLL NO", "NAME"], as_index=False)
+        .agg(
+            PASS_SUBJECTS=("STATUS", lambda s: (s == "Pass").sum()),
+            FAIL_SUBJECTS=("STATUS", lambda s: (s == "Fail").sum()),
+        )
+    )
+    if student_performance.empty:
+        st.info("No evaluated student records found for the selected subjects.")
+        return
+
+    student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
+        student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
+    )
+    performance_bins = [
+        PERFORMANCE_BINS_MIN,
+        PERFORMANCE_WELL_MAX_FAILS,
+        PERFORMANCE_DECENT_MAX_FAILS,
+        float("inf"),
+    ]
+    student_performance["PERFORMANCE"] = pd.cut(
+        student_performance["FAIL_SUBJECTS"],
+        bins=performance_bins,
+        labels=PERFORMANCE_CATEGORIES,
+        include_lowest=True,
+    )
+    complete_pass_vs_backlog = pd.DataFrame(
+        {
+            "CATEGORY": [
+                COMPLETE_PASS_LABEL,
+                AT_LEAST_ONE_F_LABEL,
+            ],
+            "COUNT": [
+                (student_performance["FAIL_SUBJECTS"] == 0).sum(),
+                (student_performance["FAIL_SUBJECTS"] > 0).sum(),
+            ],
+        }
+    )
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Students", len(filtered_df))
     col2.metric("Pass Entries", int(pass_fail.loc[pass_fail["STATUS"] == "Pass", "COUNT"].sum()))
     col3.metric("Fail Entries", int(pass_fail.loc[pass_fail["STATUS"] == "Fail", "COUNT"].sum()))
 
-    fig1, ax1 = plt.subplots(figsize=(5, 3.5))
-    ax1.bar(pass_fail["STATUS"], pass_fail["COUNT"], color=[SOFT_COLORS["pass"], SOFT_COLORS["fail"]])
-    ax1.set_title("Pass vs Fail Count")
-    style_axis(ax1, xlabel="Result Status", ylabel="Count")
-    downloadable_plot(fig1, "pass_vs_fail.png")
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        fig1, ax1 = plt.subplots(figsize=PASS_FAIL_CHART_SIZE)
+        bars1 = ax1.bar(pass_fail["STATUS"], pass_fail["COUNT"], color=[SOFT_COLORS["pass"], SOFT_COLORS["fail"]])
+        ax1.bar_label(bars1, padding=3, fontsize=9)
+        ax1.set_title("Pass vs Fail Count")
+        style_axis(ax1, xlabel="Result Status", ylabel="Count")
+        downloadable_plot(fig1, "pass_vs_fail.png")
+
+    with chart_col2:
+        fig1b, ax1b = plt.subplots(figsize=STUDENT_STATUS_CHART_SIZE)
+        bars1b = ax1b.bar(
+            complete_pass_vs_backlog["CATEGORY"],
+            complete_pass_vs_backlog["COUNT"],
+            color=[SOFT_COLORS["pass"], SOFT_COLORS["accent"]],
+        )
+        ax1b.bar_label(bars1b, padding=3, fontsize=9)
+        ax1b.set_title("Students: Complete Pass vs At Least One F")
+        style_axis(ax1b, xlabel="Student Category", ylabel="Students", rotate_x=12)
+        downloadable_plot(fig1b, "students_complete_pass_vs_backlog.png")
+
+    st.subheader("Student Performance Category Filter")
+    selected_performance = st.selectbox(
+        "Choose student performance category",
+        PERFORMANCE_CATEGORIES,
+    )
+    selected_students = student_performance[
+        student_performance["PERFORMANCE"] == selected_performance
+    ]
+    selected_students = selected_students.sort_values(
+        by=STUDENT_PERFORMANCE_SORT_COLUMNS,
+        ascending=STUDENT_PERFORMANCE_SORT_ASCENDING,
+    )
+    st.dataframe(selected_students, use_container_width=True)
+    download_table_button(
+        selected_students,
+        f"Download {selected_performance} Students",
+        f"{selected_performance.lower().replace(' ', '_')}_students.csv",
+    )
 
     failure_details = (
         long_df[long_df["STATUS"] == "Fail"]
