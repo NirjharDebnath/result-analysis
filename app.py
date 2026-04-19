@@ -454,14 +454,14 @@ def page_upload_and_validate():
 
     uploaded_file = st.file_uploader("Upload result file", type=["csv", "xls", "xlsx"])
     if not uploaded_file:
-        st.info("Upload a CSV, XLS, or XLSX file to begin analysis.")
+        st.info("Upload a CSV or XLSX file to begin analysis.")
         return
 
     try:
         df = read_uploaded_dataset(uploaded_file)
     except Exception as exc:
         st.error(
-            f"Unable to read uploaded file. Please upload a valid CSV/XLS/XLSX with section headers. Details: {exc}"
+            f"Unable to read uploaded file. Please upload a valid CSV/XLSX with section headers. Details: {exc}"
         )
         return
 
