@@ -588,16 +588,19 @@ def page_course_subject_analysis():
         student_performance["SGPA_VALUE"] = pd.NA
 
     poor_performance_mask = student_performance["FAIL_SUBJECTS"] > 0
-    good_performance_mask = pd.Series(False, index=student_performance.index)
+    performance_conditions = [poor_performance_mask]
+    performance_choices = [POOR_PERFORMANCE_LABEL]
     if good_gpa_threshold is not None:
         good_performance_mask = (
             (student_performance["FAIL_SUBJECTS"] == 0)
             & (student_performance["SGPA_VALUE"] >= good_gpa_threshold)
         )
+        performance_conditions.append(good_performance_mask)
+        performance_choices.append(GOOD_PERFORMANCE_LABEL)
     student_performance["PERFORMANCE"] = pd.Categorical(
         np.select(
-            [poor_performance_mask, good_performance_mask],
-            [POOR_PERFORMANCE_LABEL, GOOD_PERFORMANCE_LABEL],
+            performance_conditions,
+            performance_choices,
             default=DECENT_PERFORMANCE_LABEL,
         ),
         categories=list(PERFORMANCE_CATEGORIES),
