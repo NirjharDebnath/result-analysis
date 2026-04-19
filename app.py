@@ -290,7 +290,7 @@ def read_uploaded_dataset(uploaded_file) -> pd.DataFrame:
     file_name = uploaded_file.name.lower()
     if file_name.endswith(".csv"):
         raw_df = pd.read_csv(uploaded_file, dtype=str, header=None)
-    elif file_name.endswith(".xlsx"):
+    elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
         raw_df = pd.read_excel(uploaded_file, dtype=str, header=None)
     else:
         raise ValueError("Unsupported file format. Please upload CSV or XLSX.")
