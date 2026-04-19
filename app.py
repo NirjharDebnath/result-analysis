@@ -51,7 +51,7 @@ PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
 PERFORMANCE_WELL_MAX_FAILS = 0
 PERFORMANCE_DECENT_MAX_FAILS = 1
-PERFORMANCE_BIN_LOWER_BOUND = -1
+PERFORMANCE_BIN_LOWER_BOUND = float("-inf")
 PERFORMANCE_CATEGORIES = (
     "Performing Well",
     "Performing Decently",
@@ -560,7 +560,7 @@ def page_course_subject_analysis():
     student_performance["PERFORMANCE"] = pd.cut(
         student_performance["FAIL_SUBJECTS"],
         bins=performance_bins,
-        labels=list(PERFORMANCE_CATEGORIES),
+        labels=PERFORMANCE_CATEGORIES,
         include_lowest=True,
     ).astype(str)
     complete_pass_vs_backlog = pd.DataFrame(
@@ -605,7 +605,7 @@ def page_course_subject_analysis():
     st.subheader("Student Performance Category Filter")
     selected_performance = st.selectbox(
         "Choose student performance category",
-        list(PERFORMANCE_CATEGORIES),
+        PERFORMANCE_CATEGORIES,
     )
     selected_students = student_performance[
         student_performance["PERFORMANCE"] == selected_performance
