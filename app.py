@@ -51,7 +51,7 @@ PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
 PERFORMANCE_WELL_MAX_FAILS = 0
 PERFORMANCE_DECENT_MAX_FAILS = 1
-PERFORMANCE_BIN_LOWER_BOUND = float("-inf")
+PERFORMANCE_BINS_MIN = float("-inf")
 PERFORMANCE_CATEGORIES = (
     "Performing Well",
     "Performing Decently",
@@ -552,7 +552,7 @@ def page_course_subject_analysis():
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
     performance_bins = [
-        PERFORMANCE_BIN_LOWER_BOUND,
+        PERFORMANCE_BINS_MIN,
         PERFORMANCE_WELL_MAX_FAILS,
         PERFORMANCE_DECENT_MAX_FAILS,
         float("inf"),
@@ -562,7 +562,7 @@ def page_course_subject_analysis():
         bins=performance_bins,
         labels=PERFORMANCE_CATEGORIES,
         include_lowest=True,
-    ).astype(str)
+    )
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
@@ -617,7 +617,7 @@ def page_course_subject_analysis():
     st.dataframe(selected_students, use_container_width=True)
     download_table_button(
         selected_students,
-        f"Download {selected_performance.lower()} students",
+        f"Download {selected_performance} Students",
         f"{selected_performance.lower().replace(' ', '_')}_students.csv",
     )
 
