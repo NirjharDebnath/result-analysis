@@ -49,13 +49,10 @@ LOGO_CANDIDATE_PATHS = [
 ]
 PASS_FAIL_CHART_SIZE = (5, 3.5)
 STUDENT_STATUS_CHART_SIZE = (6, 3.5)
-PERFORMANCE_WELL_MAX_FAILS = 0
-PERFORMANCE_DECENT_MAX_FAILS = 1
-PERFORMANCE_BINS_MIN = float("-inf")
 PERFORMANCE_CATEGORIES = (
-    "Performing Well",
-    "Performing Decently",
-    "Performing Poorly",
+    "Poor Performance",
+    "Good Performance",
+    "Decent Performance",
 )
 COMPLETE_PASS_LABEL = "Passed All Subjects"
 AT_LEAST_ONE_F_LABEL = "At Least One F"
@@ -551,18 +548,51 @@ def page_course_subject_analysis():
     student_performance["TOTAL_EVALUATED_SUBJECTS"] = (
         student_performance["PASS_SUBJECTS"] + student_performance["FAIL_SUBJECTS"]
     )
-    performance_bins = [
-        PERFORMANCE_BINS_MIN,
-        PERFORMANCE_WELL_MAX_FAILS,
-        PERFORMANCE_DECENT_MAX_FAILS,
-        float("inf"),
-    ]
-    student_performance["PERFORMANCE"] = pd.cut(
-        student_performance["FAIL_SUBJECTS"],
-        bins=performance_bins,
-        labels=PERFORMANCE_CATEGORIES,
-        include_lowest=True,
-    )
+    sgpa_col = get_sgpa_column(filtered_df)
+    good_gpa_threshold = None
+    if sgpa_col:
+        sgpa_by_student = (
+            filtered_df[["ROLL NO", "NAME", sgpa_col]]
+            .drop_duplicates(subset=["ROLL NO", "NAME"])
+            .rename(columns={sgpa_col: "SGPA_VALUE"})
+        )
+        sgpa_by_student["SGPA_VALUE"] = pd.to_numeric(
+            sgpa_by_student["SGPA_VALUE"], errors="coerce"
+        )
+        student_performance = student_performance.merge(
+            sgpa_by_student, on=["ROLL NO", "NAME"], how="left"
+        )
+        valid_sgpa = student_performance["SGPA_VALUE"].dropna()
+        if not valid_sgpa.empty:
+            min_sgpa = float(valid_sgpa.min())
+            max_sgpa = float(valid_sgpa.max())
+            default_threshold = round((min_sgpa + max_sgpa) / 2, 2)
+            if min_sgpa == max_sgpa:
+                good_gpa_threshold = min_sgpa
+                st.caption(
+                    f"Good performance GPA threshold fixed at {good_gpa_threshold:.2f} (single SGPA value in this selection)."
+                )
+            else:
+                good_gpa_threshold = st.slider(
+                    "Minimum SGPA for Good Performance",
+                    min_value=min_sgpa,
+                    max_value=max_sgpa,
+                    value=default_threshold,
+                    step=0.1,
+                )
+    if "SGPA_VALUE" not in student_performance.columns:
+        student_performance["SGPA_VALUE"] = pd.NA
+
+    student_performance["PERFORMANCE"] = PERFORMANCE_CATEGORIES[2]
+    student_performance.loc[
+        student_performance["FAIL_SUBJECTS"] > 0, "PERFORMANCE"
+    ] = PERFORMANCE_CATEGORIES[0]
+    if good_gpa_threshold is not None:
+        student_performance.loc[
+            (student_performance["FAIL_SUBJECTS"] == 0)
+            & (student_performance["SGPA_VALUE"] >= good_gpa_threshold),
+            "PERFORMANCE",
+        ] = PERFORMANCE_CATEGORIES[1]
     complete_pass_vs_backlog = pd.DataFrame(
         {
             "CATEGORY": [
@@ -632,7 +662,6 @@ def page_course_subject_analysis():
     st.dataframe(failure_details, use_container_width=True)
     download_table_button(failure_details, "Download failure details", "subject_failure_details.csv")
 
-    sgpa_col = get_sgpa_column(filtered_df)
     if sgpa_col:
         sgpa_series = pd.to_numeric(filtered_df[sgpa_col], errors="coerce").dropna()
         if not sgpa_series.empty:
