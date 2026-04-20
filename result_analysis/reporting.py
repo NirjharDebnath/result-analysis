@@ -36,11 +36,12 @@ def build_pdf_summary(
 
     sgpa_series = pd.to_numeric(series_df.get("SGPA", pd.Series(dtype=float)), errors="coerce")
     x1, y1, m1, s1 = normal_curve_points(sgpa_series)
-    subject_marks = pd.to_numeric(series_df.get(subject_for_curve, pd.Series(dtype=float)).apply(lambda v: None), errors="coerce")
     if subject_for_curve in series_df.columns:
         from .parsing import parse_grade_value
 
         subject_marks = series_df[subject_for_curve].apply(lambda v: parse_grade_value(v)[1])
+    else:
+        subject_marks = pd.Series(dtype=float)
     x2, y2, m2, s2 = normal_curve_points(subject_marks)
 
     buffer = io.BytesIO()

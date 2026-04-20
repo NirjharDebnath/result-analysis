@@ -220,12 +220,13 @@ def render_main_analysis():
 
     st.subheader("GPA Distribution Bar Graph")
     gpa_metrics = [c for c in get_gpa_columns(filtered_df) if c in filtered_df.columns]
+    selected_metric = "SGPA"
     if not gpa_metrics:
         st.warning("No SGPA/YGPA/DGPA column found for this selection.")
     else:
-        metric = st.selectbox("Select metric", gpa_metrics)
-        fig_metric = metric_distribution_bar(filtered_df[metric], metric)
-        plot_download(fig_metric, f"{metric.lower()}_distribution.png")
+        selected_metric = st.selectbox("Select metric", gpa_metrics)
+        fig_metric = metric_distribution_bar(filtered_df[selected_metric], selected_metric)
+        plot_download(fig_metric, f"{selected_metric.lower()}_distribution.png")
 
     st.subheader("Consolidated Tabular Result Analysis")
     consolidated = consolidated_subject_matrix(filtered_df, subjects)
@@ -261,7 +262,7 @@ def render_main_analysis():
     summary_pdf = build_pdf_summary(
         filtered_df=filtered_df,
         subjects=subjects,
-        gpa_metric=(gpa_metrics[0] if gpa_metrics else "SGPA"),
+        gpa_metric=selected_metric,
         include_regular_only=use_regular_only_sgpa,
         subject_for_curve=selected_subject,
         title_meta={

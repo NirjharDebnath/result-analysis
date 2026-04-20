@@ -34,14 +34,33 @@ def bar_with_labels(data: pd.DataFrame, x_col: str, y_col: str, title: str, colo
 def normal_curve_figure(series: pd.Series, x: np.ndarray, y: np.ndarray, mean: float, std: float, title: str, xlabel: str) -> plt.Figure:
     fig, ax1 = plt.subplots(figsize=(9, 4.8))
     numeric = pd.to_numeric(series, errors="coerce").dropna()
-    bins = min(12, max(4, numeric.nunique())) if not numeric.empty else 6
-    ax1.hist(numeric, bins=bins, density=True, alpha=0.35, color=AUTUMN_COLORS["secondary"], edgecolor="black", linewidth=0.6)
+    if numeric.empty:
+        ax1.text(0.5, 0.5, "No valid numeric values found", transform=ax1.transAxes, ha="center", va="center")
+    else:
+        bins = min(12, max(4, numeric.nunique()))
+        ax1.hist(
+            numeric,
+            bins=bins,
+            density=True,
+            alpha=0.35,
+            color=AUTUMN_COLORS["secondary"],
+            edgecolor="black",
+            linewidth=0.6,
+        )
     if len(x):
-        ax1.plot(x, y, color=AUTUMN_COLORS["year_lag"], linewidth=2.2, label=f"Normal Curve (μ={mean:.2f}, σ={std:.2f})")
+        ax1.plot(
+            x,
+            y,
+            color=AUTUMN_COLORS["year_lag"],
+            linewidth=2.2,
+            label=f"Normal Curve (μ={mean:.2f}, σ={std:.2f})",
+        )
         ax1.axvline(mean, color=AUTUMN_COLORS["primary"], linestyle="--", linewidth=1.8, label=f"Mean {mean:.2f}")
     ax1.set_title(title, fontsize=12, fontweight="bold")
     base_style(ax1, xlabel=xlabel, ylabel="Density")
-    ax1.legend(frameon=False, fontsize=8)
+    handles, labels = ax1.get_legend_handles_labels()
+    if handles:
+        ax1.legend(frameon=False, fontsize=8)
     fig.tight_layout()
     return fig
 
