@@ -44,13 +44,20 @@ if data:
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
     
     # --- STRICT SKIP LIST ---
+    # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
-    valid_subjects = [
-        c for c in all_subject_cols 
-        if c in filtered_df.columns 
-        and str(c).upper().strip() not in skip_list
-        and (filtered_df[c].astype(str).str.replace(r'^(nan|None|)$', '', regex=True).str.strip() != "").any()
-    ]
+    
+    valid_subjects = []
+    for c in all_subject_cols:
+        if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
+            # Convert column to uppercase strings to check for placeholders
+            col_data = filtered_df[c].astype(str).str.strip().str.upper()
+            
+            # If the column ONLY consists of these placeholders, it doesn't belong to this course
+            is_empty_column = col_data.isin(["NAN", "NONE", "", "---", "NA", "N/A", "<NA>"]).all()
+            
+            if not is_empty_column:
+                valid_subjects.append(c)
     
     if filtered_df.empty:
         st.warning("No data found for this selection.")

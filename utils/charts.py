@@ -73,7 +73,7 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None, titl
         
     x = np.linspace(xmin, xmax, 100)
     p = norm.pdf(x, full_clean.mean(), full_clean.std())
-    ax.plot(x, p, 'k--', linewidth=2, label=f"Class Curve (\u03bc={full_clean.mean():.2f})")
+    ax.plot(x, p, 'k--', linewidth=2, label=f"Old Batch (\u03bc={full_clean.mean():.2f})")
     
     if regular_data is not None:
         reg_clean = regular_data.dropna()

@@ -52,7 +52,7 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
             statuses.append("Old Batch (Re-appearing)")
         # 3. Current Batch Pass
         elif "PASS" in sem_result:
-            statuses.append("Pass (Current Batch)")
+            statuses.append("Current Batch")
         # 4. Current Batch Fail/Backlog
         else:
             statuses.append("Backlog (Current Batch)")
