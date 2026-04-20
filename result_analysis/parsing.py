@@ -152,7 +152,9 @@ def infer_academic_year(df: pd.DataFrame) -> pd.DataFrame:
         if pd.isna(token):
             return "Unknown"
         yy = int(str(token))
-        return f"20{yy:02d}-20{(yy + 1) % 100:02d}"
+        start_year = 2000 + yy
+        end_year = start_year + 1
+        return f"{start_year}-{end_year}"
 
     out["ACADEMIC YEAR"] = extracted.apply(make_ay)
     return out

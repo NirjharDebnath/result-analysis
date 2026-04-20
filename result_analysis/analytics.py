@@ -27,13 +27,14 @@ def classify_students(df: pd.DataFrame, subjects: List[str]) -> Tuple[pd.DataFra
 
     valid["IS_FAIL"] = valid["STATUS"].eq("Fail")
     valid["IS_PRACTICAL"] = valid["SUBJECT"].astype(str).apply(is_practical_subject)
+    valid["IS_PRACTICAL_FAIL"] = valid["IS_FAIL"] & valid["IS_PRACTICAL"]
 
     grouped = (
         valid.groupby(["ROLL NO", "NAME"], as_index=False)
         .agg(
             FAIL_COUNT=("IS_FAIL", "sum"),
             SUBJECT_COUNT=("SUBJECT", "count"),
-            PRACTICAL_FAIL_COUNT=("IS_FAIL", lambda s: int(s[valid.loc[s.index, "IS_PRACTICAL"]].sum())),
+            PRACTICAL_FAIL_COUNT=("IS_PRACTICAL_FAIL", "sum"),
             PRACTICAL_COUNT=("IS_PRACTICAL", "sum"),
         )
     )
