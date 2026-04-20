@@ -1,4 +1,4 @@
-# pages/1_📊_Course_Insights.py
+ # pages/1_📊_Course_Insights.py
 import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME
@@ -47,11 +47,20 @@ if data:
     # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
     
+    # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
+    skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
+    
     valid_subjects = []
     for c in all_subject_cols:
         if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
             # Convert column to uppercase strings to check for placeholders
             col_data = filtered_df[c].astype(str).str.strip().str.upper()
+            
+            # If the column ONLY consists of these placeholders, it doesn't belong to this course
+            is_empty_column = col_data.isin(["NAN", "NONE", "", "---", "NA", "N/A", "<NA>"]).all()
+            
+            if not is_empty_column:
+                valid_subjects.append(c)
             
             # If the column ONLY consists of these placeholders, it doesn't belong to this course
             is_empty_column = col_data.isin(["NAN", "NONE", "", "---", "NA", "N/A", "<NA>"]).all()
