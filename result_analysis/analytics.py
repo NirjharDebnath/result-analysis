@@ -40,6 +40,7 @@ def classify_students(df: pd.DataFrame, subjects: List[str]) -> Tuple[pd.DataFra
     )
 
     grouped["ALL_FAILED"] = grouped["FAIL_COUNT"] == grouped["SUBJECT_COUNT"]
+    # Domain rule: classify as year lag if any practical is failed or all subjects are failed.
     grouped["YEAR_LAG"] = (grouped["PRACTICAL_FAIL_COUNT"] > 0) | grouped["ALL_FAILED"]
 
     grouped["STUDENT_STATUS"] = np.select(

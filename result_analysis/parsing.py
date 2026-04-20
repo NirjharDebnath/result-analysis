@@ -145,6 +145,7 @@ def infer_academic_year(df: pd.DataFrame) -> pd.DataFrame:
     extracted = (
         out.get("ROLL NO", pd.Series(index=out.index, dtype=str))
         .astype(str)
+        # Expected roll format: 11 digits where positions 7-8 represent admission year (YY).
         .str.extract(r"^\d{6}(\d{2})\d{3}$")[0]
     )
 

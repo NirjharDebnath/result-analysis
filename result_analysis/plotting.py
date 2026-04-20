@@ -73,6 +73,7 @@ def metric_distribution_bar(series: pd.Series, metric_name: str) -> plt.Figure:
         fig.tight_layout()
         return fig
 
+    # Keep ranges readable: more bins for diverse data, otherwise enforce a minimum 4-bin layout.
     bins = np.linspace(numeric.min(), numeric.max(), 8 if numeric.nunique() > 5 else max(4, numeric.nunique() + 1))
     counts, edges = np.histogram(numeric, bins=bins)
     labels = [f"{edges[i]:.2f}-{edges[i+1]:.2f}" for i in range(len(edges) - 1)]
