@@ -1,2 +1,0 @@
-# KGEC Result Analysis Software
-
