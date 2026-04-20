@@ -1,4 +1,17 @@
-streamlit>=1.33,<2.0
-pandas>=2.0,<3.0
-matplotlib>=3.7,<4.0
-openpyxl>=3.1,<4.0
+# Core Framework
+streamlit
+
+# Data Manipulation
+pandas
+numpy
+
+# Mathematics & Statistics
+scipy
+
+# Data Visualization
+matplotlib
+seaborn
+
+# Excel File Support
+openpyxl
+xlrd
