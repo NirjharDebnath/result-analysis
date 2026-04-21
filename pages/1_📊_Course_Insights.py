@@ -5,7 +5,7 @@ from utils.constants import COLLEGE_NAME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer
 from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores
-from utils.charts import plot_status_bars, plot_normal_curve
+from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
 
@@ -154,6 +154,10 @@ if data:
                     z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
                     st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
+                    st.pyplot(
+                        plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
+                        use_container_width=True,
+                    )
 
                     st.write("") 
                     c_top, c_worst = st.columns(2)
