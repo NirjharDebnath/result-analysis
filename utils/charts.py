@@ -118,6 +118,9 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None, titl
     x = np.linspace(xmin, xmax, 100)
     p = norm.pdf(x, full_clean.mean(), full_clean.std())
     ax.plot(x, p, 'k--', linewidth=2, label=f"Old Batch (\u03bc={full_clean.mean():.2f})")
+    ax.axvline(full_clean.mean(), color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
+    ax.axvline(full_clean.mean() - full_clean.std(), color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
+    ax.axvline(full_clean.mean() + full_clean.std(), color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     
     if regular_data is not None:
         reg_clean = regular_data.dropna()

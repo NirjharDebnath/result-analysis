@@ -154,10 +154,10 @@ if data:
                     z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
                     st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
-                    st.pyplot(
-                        plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
-                        width="content",
-                    )
+                    # st.pyplot(
+                    #     plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
+                    #     width="content",
+                    # )
 
                     st.write("") 
                     c_top, c_worst = st.columns(2)
