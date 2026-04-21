@@ -22,6 +22,15 @@ def plot_status_bars(status_counts: pd.Series):
     fig.patch.set_facecolor(THEME["bg"])
     ax.set_facecolor(THEME["bg"])
     
+    base_categories = [
+        "Current Batch",
+        "Backlog (Current Batch)",
+        "Old Batch (Re-appearing)",
+        "Year Lag",
+    ]
+    incoming_categories = status_counts.index.tolist()
+    ordered_categories = base_categories + [c for c in incoming_categories if c not in base_categories]
+    status_counts = status_counts.reindex(ordered_categories, fill_value=0)
     categories = status_counts.index.tolist()
     counts = status_counts.values.tolist()
     
@@ -48,6 +57,34 @@ def plot_status_bars(status_counts: pd.Series):
     ax.set_title("Overall Batch Status", fontweight='bold')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+    return fig
+
+def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribution"):
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    fig.patch.set_facecolor(THEME["bg"])
+    ax.set_facecolor(THEME["bg"])
+
+    if z_df.empty or "Z-Score" not in z_df.columns:
+        ax.text(0.5, 0.5, "No Z-score data available", ha="center", va="center")
+        return fig
+
+    sns.histplot(
+        z_df["Z-Score"],
+        bins=12,
+        color=THEME["secondary"],
+        edgecolor="black",
+        alpha=0.6,
+        ax=ax,
+    )
+    ax.axvline(0, color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
+    ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
+    ax.axvline(-1, color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
+    ax.set_title(title, fontweight="bold")
+    ax.set_xlabel("Z-Score")
+    ax.set_ylabel("Number of Students")
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
+    ax.legend()
     plt.tight_layout()
     return fig
 
