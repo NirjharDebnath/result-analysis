@@ -46,7 +46,6 @@ if data:
     # --- THE FIX: BULLETPROOF SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
     valid_subjects = []
-    seen_subjects = set()
     
     for c in all_subject_cols:
         if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
@@ -59,9 +58,8 @@ if data:
                     has_real_data = True
                     break
             
-            if has_real_data and c not in seen_subjects:
+            if has_real_data:
                 valid_subjects.append(c)
-                seen_subjects.add(c)
 
     if filtered_df.empty:
         st.warning("No data found for this selection.")

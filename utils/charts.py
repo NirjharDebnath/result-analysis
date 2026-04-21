@@ -67,6 +67,11 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
 
     if z_df.empty or "Z-Score" not in z_df.columns:
         ax.text(0.5, 0.5, "No Z-score data available", ha="center", va="center")
+        ax.set_title(title, fontweight="bold")
+        ax.set_xlabel("Z-Score")
+        ax.set_ylabel("Number of Students")
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         return fig
 
     sns.histplot(
@@ -83,6 +88,8 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
     ax.set_title(title, fontweight="bold")
     ax.set_xlabel("Z-Score")
     ax.set_ylabel("Number of Students")
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     ax.grid(axis="y", linestyle="--", alpha=0.5)
     ax.legend()
     plt.tight_layout()
