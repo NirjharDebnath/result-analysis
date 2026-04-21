@@ -6,6 +6,7 @@ from utils.processor import require_data, apply_course_stream_filters, get_gpa_c
 from utils.visualizer import render_sidebar_branding, render_footer
 from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores
 from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution
+from utils.pdf_generator import generate_master_pdf
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
 
@@ -79,7 +80,7 @@ if data:
     filtered_df = determine_student_status(filtered_df, selected_semester)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
-    tab1, tab2, tab3 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves", "📥 Export PDF"])
 
     with tab1:
         st.subheader("Batch Overview")
@@ -181,6 +182,36 @@ if data:
                     
             except Exception as e:
                 st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
+                
+    # ... (Keep your existing tab1, tab2, tab3 code here) ...
+
+    with tab4:
+        st.subheader("📥 Export Master PDF Report")
+        st.info("💡 **What this does:** Compiles the Executive Summary, the Statistical Matrix, and generates bell curves for **every single valid subject** in the background. It organizes them neatly into a printable academic document.")
+        
+        # We need the course name string for the PDF title
+        course_name_string = str(course_df["COURSENAME"].iloc[0]) if not course_df.empty else "Unknown Course"
+
+        if st.button("Generate & Download PDF", type="primary"):
+            with st.spinner("⏳ Analyzing data and drawing all graphs... This might take 10-20 seconds."):
+                try:
+                    pdf_bytes = generate_master_pdf(
+                        course_name=course_name_string,
+                        semester=selected_semester,
+                        df=filtered_df,
+                        valid_subjects=valid_subjects,
+                        stats_df=stats_df,
+                        current_class_mask=current_class_mask
+                    )
+                    st.success("✅ PDF Generated Successfully!")
+                    st.download_button(
+                        label="⬇️ Click here to Download PDF",
+                        data=pdf_bytes,
+                        file_name=f"{course_name_string}_Sem_{selected_semester}_Analysis.pdf",
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"Failed to generate PDF: {e}")
 
 render_footer()
 
