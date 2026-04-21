@@ -25,7 +25,7 @@ KNOWN_NON_SUBJECT_COLUMNS = {
     "SPECIALIZATION",
 }
 
-PASSING_GRADES = {"O", "E", "A", "B", "C", "D", "P", "S"}
+PASSING_GRADES = {"O", "E", "A", "B", "C", "D"}
 
 # Colors kept as is for now, will update later
 SOFT_COLORS = {
