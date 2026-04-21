@@ -43,23 +43,23 @@ if data:
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
 
-    # --- THE FIX: ROBUST SUBJECT FILTER ---
+    # --- THE FIX: BULLETPROOF SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
-    placeholders = ["NAN", "NONE", "", "---", "NA", "N/A", "<NA>", "ABSENT", "AB"]
-
     valid_subjects = []
+    
     for c in all_subject_cols:
         if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
-            # Convert column to uppercase strings to check for placeholders
-            col_data = filtered_df[c].astype(str).str.strip().str.upper()
-
-            # Filter out all the fake/empty placeholder data
-            valid_entries = col_data[~col_data.isin(placeholders)]
-
-            # If there is at least ONE real grade left (like "A(32)" or "F"), it belongs to this course
-            if len(valid_entries) > 0:
+            # We use our own parser to check if there's any actual grade data in this column
+            has_real_data = False
+            for val in filtered_df[c].dropna():
+                grade, marks = parse_grade_value(val)
+                # If parse_grade_value successfully extracts a grade or a mark, it's a real subject!
+                if grade is not None or marks is not None:
+                    has_real_data = True
+                    break
+            
+            if has_real_data:
                 valid_subjects.append(c)
-
 
     if filtered_df.empty:
         st.warning("No data found for this selection.")
@@ -109,7 +109,6 @@ if data:
         selected_gpa = None
         selected_subj = None
 
-        # Helper dictionary to convert Grade Letters to a 10-point scale for math plotting
         grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
 
         with col_gpa:
@@ -124,7 +123,6 @@ if data:
             if valid_subjects:
                 selected_subj = st.selectbox("Select Subject", valid_subjects)
 
-                # Extract the Letter Grade, map it to the 10-point scale, and plot it using the grade labels
                 full_grades = filtered_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
 
@@ -139,7 +137,11 @@ if data:
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
 
-        target_col = selected_subj if z_metric_choice == "Selected Subject" else selected_gpa
+        target_col = None
+        if z_metric_choice == "Selected Subject" and selected_subj:
+            target_col = selected_subj
+        elif z_metric_choice == "Selected GPA Metric" and selected_gpa:
+            target_col = selected_gpa
 
         if target_col:
             st.markdown(f"#### 🔍 Z-Score Analysis for: **{target_col}**")
@@ -147,19 +149,21 @@ if data:
             try:
                 z_df = calculate_z_scores(display_df, target_col)
                 
-                # FIX: Check if we actually got valid math results back
                 if not z_df.empty:
-                    z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]]
+                    # Make a copy for display so we don't overwrite the original columns we need
+                    z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
                     st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
 
                     st.write("") 
                     c_top, c_worst = st.columns(2)
                     if len(z_df) > 0:
-                        c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-SCORE']:.2f}, Value: {z_df.iloc[0]['VALUE']})*")
-                        c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-SCORE']:.2f}, Value: {z_df.iloc[-1]['VALUE']})*")
+                        # --- THE FIX: We use the original z_df column names here, which prevents the KeyError crash! ---
+                        c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
+                        c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
                 else:
                     st.warning(f"Not enough valid numerical data to calculate Z-Scores for {target_col}.")
+                    
             except Exception as e:
                 st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
 
