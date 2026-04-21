@@ -172,3 +172,4 @@ if data:
                 st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
 
 render_footer()
+
