@@ -74,7 +74,7 @@ if data:
         rank_df["RANK"] = rank_df[metric_col].rank(method=rank_method, ascending=False).astype(int)
         rank_df = rank_df.sort_values(["RANK", metric_col, "NAME"], ascending=[True, False, True])
 
-        st.dataframe(rank_df, use_container_width=True)
+        st.dataframe(rank_df, width='stretch')
         download_table_button(rank_df, "Download rank list", "rank_list.csv")
 
 render_footer()

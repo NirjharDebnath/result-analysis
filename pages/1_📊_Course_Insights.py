@@ -26,8 +26,19 @@ st.markdown("""
         border: 1px solid #EAECEE; border-bottom: none;
     }
     .stTabs [aria-selected="true"] { background-color: #D35400 !important; color: white !important; font-weight: bold; }
+    div[data-baseweb="select"] > div {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+    }
+    <style>
+    div[data-baseweb="select"] > div {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+    }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 render_sidebar_branding()
 st.header(COLLEGE_NAME)
@@ -75,13 +86,13 @@ if data:
         st.info("💡 **What this shows:** A high-level view separating the current batch (Regular + Laterals) from older batch students reappearing for exams.")
         col1, col2 = st.columns([1.5, 1])
         with col1:
-            st.pyplot(plot_status_bars(filtered_df["STATUS"].value_counts()), use_container_width=True)
+            st.pyplot(plot_status_bars(filtered_df["STATUS"].value_counts()), width='stretch')
 
         with col2:
             st.write("**Tabular Result Summary**")
             total_students = len(filtered_df)
             summary_data = [{"Status": status, "Count": count, "Percentage": f"{(count / total_students * 100):.1f}%"} for status, count in filtered_df["STATUS"].value_counts().items()]
-            st.dataframe(pd.DataFrame(summary_data), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(summary_data), hide_index=True, width='stretch')
             st.divider()
             st.write(f"🎓 **Total Evaluated:** {total_students}")
             st.write(f"🍁 **Current Batch (Regular + Lateral):** {current_class_mask.sum()}")
@@ -91,7 +102,7 @@ if data:
         st.subheader("Consolidated Result Matrix")
         stats_df = calculate_subject_stats(filtered_df, valid_subjects)
         if not stats_df.empty:
-            st.dataframe(stats_df, use_container_width=True, hide_index=True)
+            st.dataframe(stats_df, width='stretch', hide_index=True)
             if "Skewness" in stats_df.columns:
                 hardest_subject = stats_df.loc[stats_df["Skewness"].idxmax()]["Subject"]
                 highest_skew = stats_df["Skewness"].max()
@@ -117,7 +128,7 @@ if data:
                 selected_gpa = st.selectbox("Select GPA Metric", gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
-                st.pyplot(plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False), use_container_width=True)
+                st.pyplot(plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False), width='stretch')
 
         with col_subj:
             if valid_subjects:
@@ -132,7 +143,7 @@ if data:
                 else:
                     reg_subj = None
 
-                st.pyplot(plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True), use_container_width=True)
+                st.pyplot(plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True), width='stretch')
 
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
@@ -153,7 +164,7 @@ if data:
                     # Make a copy for display so we don't overwrite the original columns we need
                     z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
-                    st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
+                    st.dataframe(z_summary, width='stretch', hide_index=True)
                     # st.pyplot(
                     #     plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
                     #     width="content",
