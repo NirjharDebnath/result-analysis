@@ -78,8 +78,8 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
         ax=ax,
     )
     ax.axvline(0, color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
-    ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     ax.axvline(-1, color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
+    ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     ax.set_title(title, fontweight="bold")
     ax.set_xlabel("Z-Score")
     ax.set_ylabel("Number of Students")
