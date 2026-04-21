@@ -91,19 +91,37 @@ def calculate_z_scores(df: pd.DataFrame, col: str) -> pd.DataFrame:
     df_clean = df.copy()
     
     def extract_numeric(val):
-        _, marks = parse_grade_value(val)
-        return marks
+        grade, marks = parse_grade_value(val)
+        
+        # 1. If we have the numeric points (e.g., from "A(32)"), use them!
+        if marks is not None:
+            return marks
+            
+        # 2. THE FALLBACK: If we only have a grade (e.g., "A"), map it to the strict KGEC scale
+        grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
+        if grade in grade_to_point:
+            return grade_to_point[grade]
+            
+        # 3. If it's empty, absent, or "---", return None
+        return None
 
     if df_clean[col].dtype == 'object':
         df_clean['NUMERIC_VAL'] = df_clean[col].apply(extract_numeric)
     else:
         df_clean['NUMERIC_VAL'] = pd.to_numeric(df_clean[col], errors='coerce')
     
+    # Drop anyone who doesn't have a valid number or grade point
     df_clean = df_clean.dropna(subset=['NUMERIC_VAL'])
-    if df_clean.empty: return df_clean
+    
+    # If the data frame is empty OR the standard deviation is 0 (everyone got the exact same mark)
+    if df_clean.empty or df_clean['NUMERIC_VAL'].std() == 0:
+        return pd.DataFrame() # Return empty to trigger the safe warning in the UI
 
-    mean, std = df_clean['NUMERIC_VAL'].mean(), df_clean['NUMERIC_VAL'].std()
-    df_clean["Z-Score"] = (df_clean['NUMERIC_VAL'] - mean) / std if std > 0 else 0
+    mean = df_clean['NUMERIC_VAL'].mean()
+    std = df_clean['NUMERIC_VAL'].std()
+    
+    # Calculate Z-Score safely
+    df_clean["Z-Score"] = (df_clean['NUMERIC_VAL'] - mean) / std
     
     conditions = [(df_clean["Z-Score"] > 1), (df_clean["Z-Score"] < -1)]
     choices = ["Strong (> +1\u03c3)", "Weak (< -1\u03c3)"]
