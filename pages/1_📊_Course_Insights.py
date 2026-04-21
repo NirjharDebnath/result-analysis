@@ -1,4 +1,4 @@
- # pages/1_📊_Course_Insights.py
+# pages/1_📊_Course_Insights.py
 import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME
@@ -38,43 +38,45 @@ if data:
     df, all_subject_cols = data
     st.sidebar.header("Data Filters")
     course_df = apply_course_stream_filters(df, "Select Course", "insight_course")
-    
+
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
-    
-    # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
+
+    # --- THE FIX: ROBUST SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
-    
+    placeholders = ["NAN", "NONE", "", "---", "NA", "N/A", "<NA>", "ABSENT", "AB"]
+
     valid_subjects = []
     for c in all_subject_cols:
         if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
             # Convert column to uppercase strings to check for placeholders
             col_data = filtered_df[c].astype(str).str.strip().str.upper()
-            
-            # If the column ONLY consists of these placeholders, it doesn't belong to this course
-            is_empty_column = col_data.isin(["NAN", "NONE", "", "---", "NA", "N/A", "<NA>"]).all()
-            
-            if not is_empty_column:
+
+            # Filter out all the fake/empty placeholder data
+            valid_entries = col_data[~col_data.isin(placeholders)]
+
+            # If there is at least ONE real grade left (like "A(32)" or "F"), it belongs to this course
+            if len(valid_entries) > 0:
                 valid_subjects.append(c)
-            
-    
+
+
     if filtered_df.empty:
         st.warning("No data found for this selection.")
         st.stop()
 
     filtered_df = determine_student_status(filtered_df, selected_semester)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
-    
+
     tab1, tab2, tab3 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves"])
-    
+
     with tab1:
         st.subheader("Batch Overview")
         st.info("💡 **What this shows:** A high-level view separating the current batch (Regular + Laterals) from older batch students reappearing for exams.")
         col1, col2 = st.columns([1.5, 1])
         with col1:
             st.pyplot(plot_status_bars(filtered_df["STATUS"].value_counts()), use_container_width=True)
-            
+
         with col2:
             st.write("**Tabular Result Summary**")
             total_students = len(filtered_df)
@@ -99,17 +101,17 @@ if data:
     with tab3:
         st.subheader("Statistical Bell Curves")
         st.info("💡 **What this shows:** The Normal Distribution of marks/GPAs. The orange line isolates your Current Batch, while the shaded area shows the whole class.")
-        
+
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
-        
+
         col_gpa, col_subj = st.columns(2)
         selected_gpa = None
         selected_subj = None
-        
+
         # Helper dictionary to convert Grade Letters to a 10-point scale for math plotting
         grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
-        
+
         with col_gpa:
             gpa_cols = get_gpa_columns(filtered_df)
             if gpa_cols:
@@ -117,26 +119,26 @@ if data:
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
                 st.pyplot(plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False), use_container_width=True)
-                
+
         with col_subj:
             if valid_subjects:
                 selected_subj = st.selectbox("Select Subject", valid_subjects)
-                
+
                 # Extract the Letter Grade, map it to the 10-point scale, and plot it using the grade labels
                 full_grades = filtered_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
-                
+
                 if not exclude_old_batch:
                     reg_grades = filtered_df[current_class_mask][selected_subj].apply(lambda x: parse_grade_value(x)[0])
                     reg_subj = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
                 else:
                     reg_subj = None
-                    
+
                 st.pyplot(plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True), use_container_width=True)
-                
+
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
-        
+
         target_col = selected_subj if z_metric_choice == "Selected Subject" else selected_gpa
 
         if target_col:
@@ -144,17 +146,21 @@ if data:
             st.caption("Identifies students significantly above or below the class average based on Standard Deviations (\u03c3). Z-Score > 1 means excellent performance; Z-Score < -1 means struggling performance.")
             try:
                 z_df = calculate_z_scores(display_df, target_col)
+                
+                # FIX: Check if we actually got valid math results back
                 if not z_df.empty:
                     z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]]
                     z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
                     st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
-                    
+
                     st.write("") 
                     c_top, c_worst = st.columns(2)
                     if len(z_df) > 0:
-                        c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
-                        c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
+                        c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-SCORE']:.2f}, Value: {z_df.iloc[0]['VALUE']})*")
+                        c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-SCORE']:.2f}, Value: {z_df.iloc[-1]['VALUE']})*")
+                else:
+                    st.warning(f"Not enough valid numerical data to calculate Z-Scores for {target_col}.")
             except Exception as e:
-                st.error(f"Could not calculate Z-scores for {target_col}.")
+                st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
 
 render_footer()
