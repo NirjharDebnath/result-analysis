@@ -61,7 +61,7 @@ def plot_status_bars(status_counts: pd.Series):
     return fig
 
 def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribution"):
-    fig, ax = plt.subplots(figsize=(8, 4.5))
+    fig, ax = plt.subplots(figsize=(5, 2.5))
     fig.patch.set_facecolor(THEME["bg"])
     ax.set_facecolor(THEME["bg"])
 
@@ -86,8 +86,8 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
     ax.axvline(-1, color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
     ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     ax.set_title(title, fontweight="bold")
-    ax.set_xlabel("Z-Score")
-    ax.set_ylabel("Number of Students")
+    ax.set_xlabel("Z-Score", fontsize=8)
+    ax.set_ylabel("Number of Students", fontsize=8)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.grid(axis="y", linestyle="--", alpha=0.5)

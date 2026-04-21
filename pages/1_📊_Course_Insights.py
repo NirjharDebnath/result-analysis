@@ -156,7 +156,7 @@ if data:
                     st.dataframe(z_summary.head(20), use_container_width=True, hide_index=True)
                     st.pyplot(
                         plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
-                        use_container_width=True,
+                        width="content",
                     )
 
                     st.write("") 
