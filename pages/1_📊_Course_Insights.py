@@ -43,10 +43,6 @@ if data:
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
     
-    # --- STRICT SKIP LIST ---
-    # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
-    skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
-    
     # --- STRICT SKIP LIST & ROBUST SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
     
@@ -62,11 +58,6 @@ if data:
             if not is_empty_column:
                 valid_subjects.append(c)
             
-            # If the column ONLY consists of these placeholders, it doesn't belong to this course
-            is_empty_column = col_data.isin(["NAN", "NONE", "", "---", "NA", "N/A", "<NA>"]).all()
-            
-            if not is_empty_column:
-                valid_subjects.append(c)
     
     if filtered_df.empty:
         st.warning("No data found for this selection.")
