@@ -88,8 +88,8 @@ if data:
         shown_df = shown_df[shown_df["GROUP_LABEL"].isin(selected_groups)]
     shown_df = shown_df[shown_df["METRIC"].isin(selected_metrics)]
     st.dataframe(
-        shown_df[["GROUP_LABEL", "SEMESTER_LABEL", "METRIC", "AVG_VALUE", "STUDENT_COUNT"]]
-        .sort_values(["SEMESTER_ORDER", "GROUP_LABEL", "METRIC"]),
+        shown_df.sort_values(["SEMESTER_ORDER", "GROUP_LABEL", "METRIC"])
+        [["GROUP_LABEL", "SEMESTER_LABEL", "METRIC", "AVG_VALUE", "STUDENT_COUNT"]],
         use_container_width=True,
         hide_index=True,
     )
