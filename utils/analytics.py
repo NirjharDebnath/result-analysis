@@ -126,10 +126,11 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
 
     rolls = df[roll_col].astype(str).str.strip()
     # Minimum length 8 is required because this logic expects roll format where:
-    # [0:3] is a prefix/institute token, [3:6] is course code, [6:8] is admission-year token.
+    # [0:3] is a prefix/institute token, [3:6] is course code, and admission year is inferred from roll[6:8].
     valid_rolls = rolls[rolls.str.len() >= 8]
 
-    # Default: do not penalize rows that cannot be reliably parsed.
+    # Default: do not penalize rows that cannot be reliably parsed; keep them in current class
+    # so malformed roll values do not get incorrectly flagged as old-batch reappearing students.
     current_class_mask = pd.Series(True, index=df.index, dtype=bool)
     old_batch_mask = pd.Series(False, index=df.index, dtype=bool)
 
