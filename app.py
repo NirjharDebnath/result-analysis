@@ -2,6 +2,7 @@
 import streamlit as st
 from utils.constants import COLLEGE_NAME
 from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
+from utils.analytics import build_semester_year_groups
 from utils.visualizer import render_sidebar_branding, render_footer
 
 st.set_page_config(page_title="Result Analysis", page_icon="🎓", layout="wide")
@@ -38,6 +39,19 @@ if uploaded_files:
         else:
             st.success("Dataset validated successfully.")
             st.caption(f"Processed {len(uploaded_files)} file(s).")
+            dedup_removed = int(df.attrs.get("dropped_duplicate_rows", 0))
+            if dedup_removed > 0:
+                st.caption(f"Removed {dedup_removed} duplicate row(s) with exactly matching student data.")
+
+            semester_groups_df = build_semester_year_groups(df)
+            unique_semesters = sorted(semester_groups_df["SEMESTER_LABEL"].dropna().astype(str).unique().tolist())
+            unique_groups = sorted(semester_groups_df["GROUP_LABEL"].dropna().astype(str).unique().tolist())
+            if len(unique_semesters) > 1:
+                st.info(f"Detected multiple semesters ({len(unique_semesters)}). Use the sidebar 'Semester Comparison' page for inter-sem analysis.")
+            elif len(unique_groups) > 1:
+                st.info(f"Detected multiple academic-year groups within the same semester ({len(unique_groups)}). Use 'Semester Comparison' for year-wise analysis.")
+            else:
+                st.warning("Only one semester/year group detected. Comparison features will be limited until more semester/year data is uploaded.")
             st.caption("Next step: choose a page from the left sidebar to explore insights, rankings, or student-level performance.")
             
             # Save to session state so other pages can access it

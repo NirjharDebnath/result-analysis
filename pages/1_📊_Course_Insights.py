@@ -4,8 +4,8 @@ import streamlit as st
 from utils.constants import COLLEGE_NAME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer
-from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores
-from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution
+from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, aggregate_gpa_comparison
+from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution, plot_semester_metric_bars
 from utils.pdf_generator import generate_master_pdf
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
@@ -191,6 +191,41 @@ if data:
         
         # We need the course name string for the PDF title
         course_name_string = str(course_df["COURSENAME"].iloc[0]) if not course_df.empty else "Unknown Course"
+        comparison_source_gpas = get_gpa_columns(course_df)
+        comparison_df = aggregate_gpa_comparison(course_df, comparison_source_gpas)
+        comparison_available = not comparison_df.empty and comparison_df["GROUP_LABEL"].nunique() > 1
+
+        include_comparison_graphs = st.checkbox(
+            "Include semester/year comparison graphs in PDF",
+            value=False,
+            disabled=not comparison_available,
+        )
+
+        selected_comparison_metrics = []
+        selected_comparison_groups = []
+        if comparison_available:
+            metric_options = sorted(comparison_df["METRIC"].dropna().astype(str).unique().tolist())
+            sorted_comparison_df = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")
+            group_options = sorted_comparison_df["GROUP_LABEL"].dropna().astype(str).drop_duplicates().tolist()
+            if include_comparison_graphs:
+                selected_comparison_metrics = st.multiselect(
+                    "Choose GPA metrics for comparison pages",
+                    metric_options,
+                    default=metric_options[: min(2, len(metric_options))],
+                )
+                selected_comparison_groups = st.multiselect(
+                    "Choose semester/year groups to include",
+                    group_options,
+                    default=group_options,
+                )
+                if selected_comparison_metrics:
+                    preview_metric = st.selectbox("Preview comparison graph", selected_comparison_metrics)
+                    st.pyplot(
+                        plot_semester_metric_bars(comparison_df, preview_metric, selected_comparison_groups),
+                        width="stretch",
+                    )
+        else:
+            st.caption("Comparison graphs require at least two semester/year groups within the selected course.")
 
         if st.button("Generate & Download PDF", type="primary"):
             with st.spinner("⏳ Analyzing data and drawing all graphs... This might take 10-20 seconds."):
@@ -201,7 +236,10 @@ if data:
                         df=filtered_df,
                         valid_subjects=valid_subjects,
                         stats_df=stats_df,
-                        current_class_mask=current_class_mask
+                        current_class_mask=current_class_mask,
+                        comparison_df=comparison_df if include_comparison_graphs else None,
+                        comparison_metrics=selected_comparison_metrics if include_comparison_graphs else None,
+                        comparison_groups=selected_comparison_groups if include_comparison_graphs else None,
                     )
                     st.success("✅ PDF Generated Successfully!")
                     st.download_button(
@@ -214,4 +252,3 @@ if data:
                     st.error(f"Failed to generate PDF: {e}")
 
 render_footer()
-
