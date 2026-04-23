@@ -121,28 +121,58 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     """
     Identifies the Current Class (Regulars + Laterals) vs Old Batches.
     """
-    rolls = df[roll_col].astype(str).str.strip()
-    valid_rolls = rolls[rolls.str.len() >= 10]
-    
-    if valid_rolls.empty:
+    if roll_col not in df.columns:
         return pd.Series(True, index=df.index), pd.Series(False, index=df.index)
-        
-    course_codes = valid_rolls.str[3:6]
-    entry_years = valid_rolls.str[6:8].astype(int)
-    
-    # The majority entry year defines the "Regular" batch of this file
-    regular_year = int(entry_years.mode()[0])
-    target_course = course_codes.mode()[0]
-    
-    # Regulars entered in the regular_year, Laterals entered one year later
-    is_regular = (entry_years == regular_year) & (course_codes == target_course)
-    is_lateral = (entry_years == regular_year + 1) & (course_codes == target_course)
-    
-    # Combined "Current Class" 
-    current_class_mask = is_regular | is_lateral
-    # Everyone else is from an older batch re-appearing
-    old_batch_mask = ~current_class_mask
-    
+
+    rolls = df[roll_col].astype(str).str.strip()
+    valid_rolls = rolls[rolls.str.len() >= 8]
+
+    # Default: do not penalize rows that cannot be reliably parsed.
+    current_class_mask = pd.Series(True, index=df.index, dtype=bool)
+    old_batch_mask = pd.Series(False, index=df.index, dtype=bool)
+
+    if valid_rolls.empty:
+        return current_class_mask, old_batch_mask
+
+    parsed = pd.DataFrame(index=valid_rolls.index)
+    parsed["ROLL_COURSE"] = valid_rolls.str[3:6]
+    parsed["ENTRY_YEAR"] = pd.to_numeric(valid_rolls.str[6:8], errors="coerce")
+    parsed = parsed.dropna(subset=["ENTRY_YEAR"])
+
+    if parsed.empty:
+        return current_class_mask, old_batch_mask
+
+    parsed["ENTRY_YEAR"] = parsed["ENTRY_YEAR"].astype(int)
+
+    # Prefer COURSE CODE column when present so we don't rely solely on roll slices.
+    if "COURSE CODE" in df.columns:
+        course_code_series = (
+            df["COURSE CODE"]
+            .astype(str)
+            .str.strip()
+            .replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA})
+            .dropna()
+        )
+        target_course = str(course_code_series.mode().iloc[0]) if not course_code_series.empty else str(parsed["ROLL_COURSE"].mode().iloc[0])
+    else:
+        target_course = str(parsed["ROLL_COURSE"].mode().iloc[0])
+
+    parsed = parsed[parsed["ROLL_COURSE"].astype(str) == target_course]
+    if parsed.empty:
+        return current_class_mask, old_batch_mask
+
+    year_counts = parsed["ENTRY_YEAR"].value_counts()
+    top_count = year_counts.max()
+    tied_top_years = year_counts[year_counts == top_count].index
+    # Tie-break toward the latest admission year to avoid pulling older repeating cohorts as "current".
+    regular_year = int(max(tied_top_years))
+
+    is_regular = (parsed["ENTRY_YEAR"] == regular_year)
+    is_lateral = (parsed["ENTRY_YEAR"] == regular_year + 1)
+    is_current = is_regular | is_lateral
+
+    current_class_mask.loc[parsed.index] = is_current
+    old_batch_mask.loc[parsed.index] = ~is_current
     return current_class_mask, old_batch_mask
 
 def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFrame:
