@@ -58,16 +58,24 @@ def infer_academic_year_from_roll(roll_value: object) -> Optional[int]:
     pivot = (current_two_digit_year + 5) % 100
     return (2000 + year_num) if year_num <= pivot else (1900 + year_num)
 
-def format_semester_group_label(semester_label: object, academic_year: object) -> str:
-    if pd.notna(academic_year):
-        return f"{semester_label} | AY {int(academic_year)}"
-    return f"{semester_label} | AY Unknown"
+def format_semester_group_label(semester_label: object, exam_year: object) -> str:
+    if pd.notna(exam_year):
+        return f"{semester_label} | EY {int(exam_year)}"
+    return f"{semester_label} | EY Unknown"
 
 def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER", roll_col: str = "ROLL NO") -> pd.DataFrame:
     frame = df.copy()
     frame["SEMESTER_LABEL"] = frame.get(semester_col, pd.Series(index=frame.index, dtype=object)).apply(normalize_semester_label)
     frame["SEMESTER_ORDER"] = frame["SEMESTER_LABEL"].apply(get_semester_order)
-    frame["ACADEMIC_YEAR"] = frame.get(roll_col, pd.Series(index=frame.index, dtype=object)).apply(infer_academic_year_from_roll)
+
+    # Prefer the user-supplied EXAM YEAR column over roll-based admission-year inference.
+    # This ensures students who sat the same exam are always grouped together on the
+    # Semester Comparison page, regardless of their admission year (i.e. backlog /
+    # re-appearing students are not split away from the current cohort).
+    if "EXAM YEAR" in frame.columns and frame["EXAM YEAR"].notna().any():
+        frame["ACADEMIC_YEAR"] = pd.to_numeric(frame["EXAM YEAR"], errors="coerce")
+    else:
+        frame["ACADEMIC_YEAR"] = frame.get(roll_col, pd.Series(index=frame.index, dtype=object)).apply(infer_academic_year_from_roll)
 
     has_any_year_data = frame["ACADEMIC_YEAR"].notna().any()
     max_years_in_any_semester = frame.groupby("SEMESTER_LABEL")["ACADEMIC_YEAR"].nunique(dropna=True).max()
