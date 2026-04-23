@@ -121,38 +121,86 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     """
     Identifies the Current Class (Regulars + Laterals) vs Old Batches.
     """
-    rolls = df[roll_col].astype(str).str.strip()
-    valid_rolls = rolls[rolls.str.len() >= 10]
-    
-    if valid_rolls.empty:
+    if roll_col not in df.columns:
         return pd.Series(True, index=df.index), pd.Series(False, index=df.index)
-        
-    course_codes = valid_rolls.str[3:6]
-    entry_years = valid_rolls.str[6:8].astype(int)
-    
-    # The majority entry year defines the "Regular" batch of this file
-    regular_year = int(entry_years.mode()[0])
-    target_course = course_codes.mode()[0]
-    
-    # Regulars entered in the regular_year, Laterals entered one year later
-    is_regular = (entry_years == regular_year) & (course_codes == target_course)
-    is_lateral = (entry_years == regular_year + 1) & (course_codes == target_course)
-    
-    # Combined "Current Class" 
-    current_class_mask = is_regular | is_lateral
-    # Everyone else is from an older batch re-appearing
-    old_batch_mask = ~current_class_mask
-    
+
+    rolls = df[roll_col].astype(str).str.strip()
+    # Minimum length 8 is required because this logic expects roll format where:
+    # [0:3] is a prefix/institute token, [3:6] is course code, and admission year is inferred from roll[6:8].
+    valid_rolls = rolls[rolls.str.len() >= 8]
+
+    # Default: do not penalize rows that cannot be reliably parsed; keep them in current class
+    # so malformed roll values do not get incorrectly flagged as old-batch reappearing students.
+    current_class_mask = pd.Series(True, index=df.index, dtype=bool)
+    old_batch_mask = pd.Series(False, index=df.index, dtype=bool)
+
+    if valid_rolls.empty:
+        return current_class_mask, old_batch_mask
+
+    parsed = pd.DataFrame(index=valid_rolls.index)
+    parsed["ROLL_COURSE"] = valid_rolls.str[3:6]
+    parsed["ENTRY_YEAR"] = valid_rolls.apply(infer_academic_year_from_roll)
+    parsed = parsed.dropna(subset=["ENTRY_YEAR"])
+
+    if parsed.empty:
+        return current_class_mask, old_batch_mask
+
+    parsed["ENTRY_YEAR"] = parsed["ENTRY_YEAR"].astype(int)
+
+    # Prefer COURSE CODE column when present so we don't rely solely on roll slices.
+    roll_course_mode = parsed["ROLL_COURSE"].mode()
+    fallback_course = str(roll_course_mode.iloc[0]) if not roll_course_mode.empty else ""
+    target_course = fallback_course
+
+    if "COURSE CODE" in df.columns:
+        course_code_series = (
+            df["COURSE CODE"]
+            .astype(str)
+            .str.strip()
+            .replace({"": pd.NA})
+            .dropna()
+            .str.upper()
+            .replace({"NAN": pd.NA, "NONE": pd.NA, "NULL": pd.NA})
+            .dropna()
+        )
+        if not course_code_series.empty:
+            course_mode = course_code_series.mode()
+            if not course_mode.empty:
+                target_course = str(course_mode.iloc[0])
+
+    if not target_course:
+        return current_class_mask, old_batch_mask
+
+    parsed = parsed[parsed["ROLL_COURSE"] == target_course]
+    if parsed.empty:
+        return current_class_mask, old_batch_mask
+
+    year_counts = parsed["ENTRY_YEAR"].value_counts()
+    top_count = year_counts.max()
+    tied_top_years = year_counts[year_counts == top_count].index
+    # Tie-break toward the latest admission year to avoid pulling older repeating cohorts as "current".
+    regular_year = int(tied_top_years.max())
+
+    is_regular = (parsed["ENTRY_YEAR"] == regular_year)
+    is_lateral = (parsed["ENTRY_YEAR"] == regular_year + 1)
+    is_current = is_regular | is_lateral
+
+    current_class_mask.loc[parsed.index] = is_current
+    old_batch_mask.loc[parsed.index] = ~is_current
     return current_class_mask, old_batch_mask
 
 def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFrame:
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
+    semester_order = get_semester_order(semester_name)
+    # get_semester_order returns 999 when semester text cannot be parsed into a numeric order.
+    expected_elapsed_years = max(0, (semester_order - 1) // 2) if semester_order != 999 else None
     
     current_class_mask, _ = get_class_masks(df)
     
     statuses = []
+    timeline_statuses = []
     for idx, row in df.iterrows():
         sem_result = str(row.get("SEMESTER RESULT", "")).upper()
         has_ygpa = pd.notna(row.get("YGPA")) and str(row.get("YGPA")).strip() != ""
@@ -169,8 +217,26 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
         # 4. Current Batch Fail/Backlog
         else:
             statuses.append("Backlog (Current Batch)")
+
+        exam_year = pd.to_numeric(row.get("EXAM YEAR"), errors="coerce")
+        admission_year = infer_academic_year_from_roll(row.get("ROLL NO"))
+        if pd.isna(exam_year) or admission_year is None or expected_elapsed_years is None:
+            timeline_statuses.append("Unknown")
+        else:
+            elapsed_years = exam_year - admission_year
+            if elapsed_years < 0:
+                timeline_statuses.append("Unknown")
+            # expected_elapsed_years is the normal admission-to-exam gap for the selected semester.
+            # same/less => current cohort, +1 => older (past year), beyond +1 => reappearing backlog.
+            elif elapsed_years <= expected_elapsed_years:
+                timeline_statuses.append("Current Year Students")
+            elif elapsed_years == expected_elapsed_years + 1:
+                timeline_statuses.append("Past Year Students")
+            else:
+                timeline_statuses.append("Reappearing Students")
             
     df["STATUS"] = statuses
+    df["EXAM TIMELINE"] = timeline_statuses
     return df
 
 def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFrame:
