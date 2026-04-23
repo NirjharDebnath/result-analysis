@@ -152,35 +152,6 @@ def get_primary_sgpa_col(file_df: pd.DataFrame, sem_order: int) -> Optional[str]
     return None
 
 
-def get_primary_ygpa_col(file_df: pd.DataFrame, sem_order: int) -> Optional[str]:
-    """
-    Return the column name holding the year GPA for the current semester group.
-
-    Priority:
-    1. ``YGPA{sem_order}`` (even-sem files store year GPA as YGPA4, YGPA8, …)
-    2. Plain ``YGPA`` column
-    3. Any column whose normalised name contains ``YGPA`` and has numeric data
-
-    Returns ``None`` when no suitable column can be found.
-    """
-    if sem_order != UNKNOWN_SEMESTER_ORDER:
-        candidate = f"YGPA{sem_order}"
-        col_upper = {c.upper(): c for c in file_df.columns}
-        if candidate.upper() in col_upper:
-            col = col_upper[candidate.upper()]
-            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
-                return col
-    for col in file_df.columns:
-        if normalize_token(col) == "YGPA":
-            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
-                return col
-    for col in file_df.columns:
-        if "YGPA" in normalize_token(col):
-            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
-                return col
-    return None
-
-
 def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.DataFrame:
     """
     Builds comparison data for the semester comparison page.
@@ -251,59 +222,8 @@ def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.D
         how="left",
     )
 
-    # ---- Normalize per-file numbered SGPA/YGPA columns into unified metrics ----
-    # When files contain semester-specific columns (SGPA3, SGPA4, YGPA4, …), each
-    # column only has data for one file, so the comparison chart ends up with a
-    # single bar.  We map each file's "current-semester" SGPA/YGPA into plain
-    # "SGPA"/"YGPA" columns so every file contributes to the same metric bar.
-    _UNIFIED_SGPA = "SGPA"
-    _UNIFIED_YGPA = "YGPA"
-
-    numbered_sgpa = [c for c in gpa_columns if re.search(r"SGPA\d", normalize_token(c))]
-    numbered_ygpa = [c for c in gpa_columns if re.search(r"YGPA\d", normalize_token(c))]
-
-    effective_metrics = list(gpa_columns)
-
-    # Pre-compute per-file sub-DataFrames once to avoid repeated filtering in loops below
-    file_dfs = {src: working[working["SOURCE FILE"] == src] for src in file_meta["SOURCE FILE"]}
-
-    if numbered_sgpa:
-        file_sgpa_map = {}
-        for _, frow in file_meta.iterrows():
-            src = frow["SOURCE FILE"]
-            sem_order = int(frow["SEM_ORDER"]) if pd.notna(frow["SEM_ORDER"]) else UNKNOWN_SEMESTER_ORDER
-            file_sgpa_map[src] = get_primary_sgpa_col(file_dfs[src], sem_order)
-
-        working[_UNIFIED_SGPA] = None
-        for src, col in file_sgpa_map.items():
-            mask = working["SOURCE FILE"] == src
-            if col and col in working.columns:
-                working.loc[mask, _UNIFIED_SGPA] = working.loc[mask, col]
-
-        effective_metrics = [c for c in effective_metrics if c not in numbered_sgpa]
-        if _UNIFIED_SGPA not in effective_metrics:
-            effective_metrics = [_UNIFIED_SGPA] + effective_metrics
-
-    if numbered_ygpa:
-        file_ygpa_map = {}
-        for _, frow in file_meta.iterrows():
-            src = frow["SOURCE FILE"]
-            sem_order = int(frow["SEM_ORDER"]) if pd.notna(frow["SEM_ORDER"]) else UNKNOWN_SEMESTER_ORDER
-            file_ygpa_map[src] = get_primary_ygpa_col(file_dfs[src], sem_order)
-
-        working[_UNIFIED_YGPA] = None
-        for src, col in file_ygpa_map.items():
-            mask = working["SOURCE FILE"] == src
-            if col and col in working.columns:
-                working.loc[mask, _UNIFIED_YGPA] = working.loc[mask, col]
-
-        effective_metrics = [c for c in effective_metrics if c not in numbered_ygpa]
-        if _UNIFIED_YGPA not in effective_metrics:
-            effective_metrics = [_UNIFIED_YGPA] + effective_metrics
-    # ---- End normalization ----
-
     rows = []
-    for metric in effective_metrics:
+    for metric in gpa_columns:
         if metric not in working.columns:
             continue
         metric_df = working[["GROUP_LABEL", "SEM_LABEL", "SEM_ORDER", metric]].copy()
