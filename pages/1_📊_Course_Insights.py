@@ -98,6 +98,11 @@ if data:
             st.write(f"🎓 **Total Evaluated:** {total_students}")
             st.write(f"🍁 **Current Batch (Regular + Lateral):** {current_class_mask.sum()}")
             st.write(f"🍂 **Old Batch (Re-appearing):** {old_batch_mask.sum()}")
+            if "EXAM TIMELINE" in filtered_df.columns:
+                st.divider()
+                st.write("🗓️ **Exam Timeline Split**")
+                for timeline, count in filtered_df["EXAM TIMELINE"].value_counts().items():
+                    st.write(f"• {timeline}: {count}")
 
     with tab2:
         st.subheader("Consolidated Result Matrix")

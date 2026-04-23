@@ -1,5 +1,6 @@
 # app.py
 import streamlit as st
+from datetime import datetime
 from utils.constants import COLLEGE_NAME
 from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
 from utils.analytics import build_semester_year_groups
@@ -29,7 +30,44 @@ uploaded_files = st.file_uploader(
 
 if uploaded_files:
     try:
-        df = read_uploaded_datasets(uploaded_files)
+        month_options = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+        current_year = datetime.utcnow().year
+        current_month_index = datetime.utcnow().month - 1
+
+        exam_session_by_file = {}
+        with st.expander("🗓️ Exam Month/Year per Uploaded File", expanded=True):
+            st.caption("Enter the exam month and year for each uploaded file. These values are added as columns for better current/past/reappearing separation.")
+            for idx, uploaded_file in enumerate(uploaded_files):
+                c1, c2, c3 = st.columns([3, 2, 2])
+                with c1:
+                    st.write(f"**{uploaded_file.name}**")
+                with c2:
+                    exam_month = st.selectbox(
+                        "Month",
+                        month_options,
+                        index=current_month_index,
+                        key=f"exam_month_{idx}_{uploaded_file.name}",
+                        label_visibility="collapsed",
+                    )
+                with c3:
+                    exam_year = st.number_input(
+                        "Year",
+                        min_value=1990,
+                        max_value=2100,
+                        value=current_year,
+                        step=1,
+                        key=f"exam_year_{idx}_{uploaded_file.name}",
+                        label_visibility="collapsed",
+                    )
+                exam_session_by_file[str(uploaded_file.name)] = {
+                    "EXAM MONTH": exam_month,
+                    "EXAM YEAR": int(exam_year),
+                }
+
+        df = read_uploaded_datasets(uploaded_files, exam_session_by_file=exam_session_by_file)
         errors, metadata_cols, subject_cols = validate_dataset(df)
 
         if errors:

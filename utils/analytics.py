@@ -193,10 +193,13 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
+    semester_order = get_semester_order(semester_name)
+    expected_elapsed_years = max(0, (semester_order - 1) // 2) if semester_order != 999 else None
     
     current_class_mask, _ = get_class_masks(df)
     
     statuses = []
+    timeline_statuses = []
     for idx, row in df.iterrows():
         sem_result = str(row.get("SEMESTER RESULT", "")).upper()
         has_ygpa = pd.notna(row.get("YGPA")) and str(row.get("YGPA")).strip() != ""
@@ -213,8 +216,22 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
         # 4. Current Batch Fail/Backlog
         else:
             statuses.append("Backlog (Current Batch)")
+
+        exam_year = pd.to_numeric(row.get("EXAM YEAR"), errors="coerce")
+        admission_year = infer_academic_year_from_roll(row.get("ROLL NO"))
+        if pd.isna(exam_year) or admission_year is None or expected_elapsed_years is None:
+            timeline_statuses.append("Unknown")
+        else:
+            elapsed_years = int(exam_year) - int(admission_year)
+            if elapsed_years <= expected_elapsed_years:
+                timeline_statuses.append("Current Year Students")
+            elif elapsed_years == expected_elapsed_years + 1:
+                timeline_statuses.append("Past Year Students")
+            else:
+                timeline_statuses.append("Reappearing Students")
             
     df["STATUS"] = statuses
+    df["EXAM TIMELINE"] = timeline_statuses
     return df
 
 def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFrame:
