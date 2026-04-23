@@ -1,7 +1,7 @@
 # app.py
 import streamlit as st
 from utils.constants import COLLEGE_NAME
-from utils.processor import read_uploaded_dataset, validate_dataset, get_sample_template_csv
+from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
 from utils.visualizer import render_sidebar_branding, render_footer
 
 st.set_page_config(page_title="Result Analysis", page_icon="🎓", layout="wide")
@@ -20,11 +20,15 @@ st.download_button(
     mime="text/csv",
 )
 
-uploaded_file = st.file_uploader("Upload result file", type=["csv", "xls", "xlsx"])
+uploaded_files = st.file_uploader(
+    "Upload result file(s)",
+    type=["csv", "xls", "xlsx"],
+    accept_multiple_files=True
+)
 
-if uploaded_file:
+if uploaded_files:
     try:
-        df = read_uploaded_dataset(uploaded_file)
+        df = read_uploaded_datasets(uploaded_files)
         errors, metadata_cols, subject_cols = validate_dataset(df)
 
         if errors:
@@ -33,6 +37,7 @@ if uploaded_file:
                 st.write(f"- {err}")
         else:
             st.success("Dataset validated successfully.")
+            st.caption(f"Processed {len(uploaded_files)} file(s).")
             st.caption("Next step: choose a page from the left sidebar to explore insights, rankings, or student-level performance.")
             
             # Save to session state so other pages can access it

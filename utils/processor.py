@@ -220,6 +220,30 @@ def read_uploaded_dataset(uploaded_file) -> pd.DataFrame:
         raise ValueError("No valid student rows found.")
     return clean_uploaded_data(normalize_columns(parsed_df))
 
+def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
+    if not uploaded_files:
+        raise ValueError("No files uploaded.")
+
+    files = uploaded_files if isinstance(uploaded_files, list) else [uploaded_files]
+    datasets: List[pd.DataFrame] = []
+    file_errors: List[str] = []
+
+    expected_errors = (ValueError, pd.errors.ParserError, UnicodeDecodeError, OSError)
+    for uploaded_file in files:
+        try:
+            datasets.append(read_uploaded_dataset(uploaded_file))
+        except expected_errors as exc:
+            file_name = getattr(uploaded_file, "name", "Unknown file")
+            file_errors.append(f"{file_name}: {exc}")
+
+    if file_errors:
+        raise ValueError("One or more files failed to process:\n- " + "\n- ".join(file_errors))
+    if not datasets:
+        raise ValueError("No valid student rows found across uploaded files.")
+
+    combined_df = pd.concat(datasets, ignore_index=True)
+    return combined_df
+
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
     courses = sorted(df["COURSENAME"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
     selected_course = st.selectbox(course_label, courses, key=course_key)
