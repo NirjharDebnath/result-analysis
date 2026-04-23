@@ -264,18 +264,21 @@ def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.D
 
     effective_metrics = list(gpa_columns)
 
+    # Pre-compute per-file sub-DataFrames once to avoid repeated filtering in loops below
+    file_dfs = {src: working[working["SOURCE FILE"] == src] for src in file_meta["SOURCE FILE"]}
+
     if numbered_sgpa:
         file_sgpa_map = {}
         for _, frow in file_meta.iterrows():
             src = frow["SOURCE FILE"]
             sem_order = int(frow["SEM_ORDER"]) if pd.notna(frow["SEM_ORDER"]) else UNKNOWN_SEMESTER_ORDER
-            file_sgpa_map[src] = get_primary_sgpa_col(working[working["SOURCE FILE"] == src], sem_order)
+            file_sgpa_map[src] = get_primary_sgpa_col(file_dfs[src], sem_order)
 
         working[_UNIFIED_SGPA] = None
         for src, col in file_sgpa_map.items():
             mask = working["SOURCE FILE"] == src
             if col and col in working.columns:
-                working.loc[mask, _UNIFIED_SGPA] = working.loc[mask, col].values
+                working.loc[mask, _UNIFIED_SGPA] = working.loc[mask, col]
 
         effective_metrics = [c for c in effective_metrics if c not in numbered_sgpa]
         if _UNIFIED_SGPA not in effective_metrics:
@@ -286,13 +289,13 @@ def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.D
         for _, frow in file_meta.iterrows():
             src = frow["SOURCE FILE"]
             sem_order = int(frow["SEM_ORDER"]) if pd.notna(frow["SEM_ORDER"]) else UNKNOWN_SEMESTER_ORDER
-            file_ygpa_map[src] = get_primary_ygpa_col(working[working["SOURCE FILE"] == src], sem_order)
+            file_ygpa_map[src] = get_primary_ygpa_col(file_dfs[src], sem_order)
 
         working[_UNIFIED_YGPA] = None
         for src, col in file_ygpa_map.items():
             mask = working["SOURCE FILE"] == src
             if col and col in working.columns:
-                working.loc[mask, _UNIFIED_YGPA] = working.loc[mask, col].values
+                working.loc[mask, _UNIFIED_YGPA] = working.loc[mask, col]
 
         effective_metrics = [c for c in effective_metrics if c not in numbered_ygpa]
         if _UNIFIED_YGPA not in effective_metrics:
