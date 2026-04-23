@@ -18,7 +18,7 @@ SEMESTER_WORD_TO_NUM = {
     "NINTH": 9, "9TH": 9, "NINE": 9, "IX": 9,
     "TENTH": 10, "10TH": 10, "TEN": 10, "X": 10,
 }
-# Expected roll format contains two-digit admission year at positions [6:8], e.g. XXXXCCYY...
+# Assumes roll format like XXXCCCYYNNN..., where YY is the two-digit admission year at indices [6:8].
 ROLL_YEAR_START_INDEX = 6
 ROLL_YEAR_END_INDEX = 8
 
@@ -54,7 +54,14 @@ def infer_academic_year_from_roll(roll_value: object) -> Optional[int]:
     if not year_token.isdigit():
         return None
     year_num = int(year_token)
-    return 2000 + year_num
+    current_two_digit_year = pd.Timestamp.utcnow().year % 100
+    pivot = (current_two_digit_year + 5) % 100
+    return (2000 + year_num) if year_num <= pivot else (1900 + year_num)
+
+def format_semester_group_label(semester_label: object, academic_year: object) -> str:
+    if pd.notna(academic_year):
+        return f"{semester_label} | AY {int(academic_year)}"
+    return f"{semester_label} | AY Unknown"
 
 def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER", roll_col: str = "ROLL NO") -> pd.DataFrame:
     frame = df.copy()
@@ -67,7 +74,7 @@ def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER",
     has_year_split = has_any_year_data and max_years_in_any_semester > 1
     if has_year_split:
         frame["GROUP_LABEL"] = frame.apply(
-            lambda row: f"{row['SEMESTER_LABEL']} | AY {int(row['ACADEMIC_YEAR'])}" if pd.notna(row["ACADEMIC_YEAR"]) else f"{row['SEMESTER_LABEL']} | AY Unknown",
+            lambda row: format_semester_group_label(row["SEMESTER_LABEL"], row["ACADEMIC_YEAR"]),
             axis=1,
         )
     else:

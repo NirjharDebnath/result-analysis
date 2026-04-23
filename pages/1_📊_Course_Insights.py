@@ -205,7 +205,8 @@ if data:
         selected_comparison_groups = []
         if comparison_available:
             metric_options = sorted(comparison_df["METRIC"].dropna().astype(str).unique().tolist())
-            group_options = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")["GROUP_LABEL"].dropna().astype(str).drop_duplicates().tolist()
+            sorted_comparison_df = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")
+            group_options = sorted_comparison_df["GROUP_LABEL"].dropna().astype(str).drop_duplicates().tolist()
             if include_comparison_graphs:
                 selected_comparison_metrics = st.multiselect(
                     "Choose GPA metrics for comparison pages",
