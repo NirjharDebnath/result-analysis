@@ -18,6 +18,8 @@ SEMESTER_WORD_TO_NUM = {
     "NINTH": 9, "9TH": 9, "NINE": 9, "IX": 9,
     "TENTH": 10, "10TH": 10, "TEN": 10, "X": 10,
 }
+ROLL_YEAR_START_INDEX = 6
+ROLL_YEAR_END_INDEX = 8
 
 def normalize_semester_label(semester_value: object) -> str:
     text = str(semester_value).strip() if semester_value is not None else ""
@@ -45,9 +47,9 @@ def get_semester_order(semester_value: object) -> int:
 
 def infer_academic_year_from_roll(roll_value: object) -> Optional[int]:
     roll = str(roll_value).strip()
-    if len(roll) < 8:
+    if len(roll) < ROLL_YEAR_END_INDEX:
         return None
-    year_token = roll[6:8]
+    year_token = roll[ROLL_YEAR_START_INDEX:ROLL_YEAR_END_INDEX]
     if not year_token.isdigit():
         return None
     year_num = int(year_token)
@@ -59,7 +61,9 @@ def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER",
     frame["SEMESTER_ORDER"] = frame["SEMESTER_LABEL"].apply(get_semester_order)
     frame["ACADEMIC_YEAR"] = frame.get(roll_col, pd.Series(index=frame.index, dtype=object)).apply(infer_academic_year_from_roll)
 
-    has_year_split = frame["ACADEMIC_YEAR"].notna().sum() > 0 and frame.groupby("SEMESTER_LABEL")["ACADEMIC_YEAR"].nunique(dropna=True).max() > 1
+    has_any_year_data = frame["ACADEMIC_YEAR"].notna().any()
+    max_years_in_any_semester = frame.groupby("SEMESTER_LABEL")["ACADEMIC_YEAR"].nunique(dropna=True).max()
+    has_year_split = bool(has_any_year_data and max_years_in_any_semester > 1)
     if has_year_split:
         frame["GROUP_LABEL"] = frame.apply(
             lambda row: f"{row['SEMESTER_LABEL']} | AY {int(row['ACADEMIC_YEAR'])}" if pd.notna(row["ACADEMIC_YEAR"]) else f"{row['SEMESTER_LABEL']} | AY Unknown",

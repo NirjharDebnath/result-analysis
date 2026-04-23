@@ -143,9 +143,14 @@ def deduplicate_exact_rows(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 
     canonical = df.copy()
     for col in canonical.columns:
-        canonical[col] = canonical[col].fillna("").astype(str).str.strip()
+        series = canonical[col]
+        if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
+            canonical[col] = series.fillna("").astype(str).str.strip()
+        else:
+            canonical[col] = series.fillna("")
 
-    duplicate_mask = canonical.duplicated(keep="first")
+    row_hash = pd.util.hash_pandas_object(canonical, index=False)
+    duplicate_mask = row_hash.duplicated(keep="first")
     duplicate_count = int(duplicate_mask.sum())
     deduped_df = df.loc[~duplicate_mask].copy().reset_index(drop=True)
     return deduped_df, duplicate_count
