@@ -239,7 +239,6 @@ def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
         raise ValueError("One or more files failed to process:\n- " + "\n- ".join(file_errors))
 
     combined_df = pd.concat(datasets, ignore_index=True, sort=False)
-    combined_df = clean_uploaded_data(normalize_columns(combined_df))
     if combined_df.empty:
         raise ValueError("No valid student rows found across uploaded files.")
     return combined_df
