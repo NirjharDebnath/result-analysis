@@ -18,6 +18,7 @@ SEMESTER_WORD_TO_NUM = {
     "NINTH": 9, "9TH": 9, "NINE": 9, "IX": 9,
     "TENTH": 10, "10TH": 10, "TEN": 10, "X": 10,
 }
+# Expected roll format contains two-digit admission year at positions [6:8], e.g. XXXXCCYY...
 ROLL_YEAR_START_INDEX = 6
 ROLL_YEAR_END_INDEX = 8
 
@@ -63,7 +64,7 @@ def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER",
 
     has_any_year_data = frame["ACADEMIC_YEAR"].notna().any()
     max_years_in_any_semester = frame.groupby("SEMESTER_LABEL")["ACADEMIC_YEAR"].nunique(dropna=True).max()
-    has_year_split = bool(has_any_year_data and max_years_in_any_semester > 1)
+    has_year_split = has_any_year_data and max_years_in_any_semester > 1
     if has_year_split:
         frame["GROUP_LABEL"] = frame.apply(
             lambda row: f"{row['SEMESTER_LABEL']} | AY {int(row['ACADEMIC_YEAR'])}" if pd.notna(row["ACADEMIC_YEAR"]) else f"{row['SEMESTER_LABEL']} | AY Unknown",

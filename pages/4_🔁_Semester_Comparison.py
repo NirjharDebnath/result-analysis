@@ -23,7 +23,9 @@ if data:
         st.warning("No comparable GPA data found for this course.")
         st.stop()
 
-    group_options = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")["GROUP_LABEL"].dropna().astype(str).drop_duplicates().tolist()
+    sorted_groups_df = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")
+    distinct_group_series = sorted_groups_df["GROUP_LABEL"].dropna().astype(str).drop_duplicates()
+    group_options = distinct_group_series.tolist()
     metric_options = sorted(comparison_df["METRIC"].dropna().astype(str).unique().tolist())
 
     st.caption(f"Detected {len(group_options)} semester/year groups and {len(metric_options)} GPA metrics.")

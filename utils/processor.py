@@ -147,7 +147,7 @@ def deduplicate_exact_rows(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
         if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
             canonical[col] = series.fillna("").astype(str).str.strip()
         else:
-            canonical[col] = series.fillna("")
+            canonical[col] = series
 
     row_hash = pd.util.hash_pandas_object(canonical, index=False)
     duplicate_mask = row_hash.duplicated(keep="first")

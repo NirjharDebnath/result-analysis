@@ -221,7 +221,7 @@ if data:
                     preview_metric = st.selectbox("Preview comparison graph", selected_comparison_metrics)
                     st.pyplot(
                         plot_semester_metric_bars(comparison_df, preview_metric, selected_comparison_groups),
-                        width='stretch',
+                        width="stretch",
                     )
         else:
             st.caption("Comparison graphs require at least two semester/year groups within the selected course.")
