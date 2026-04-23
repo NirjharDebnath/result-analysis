@@ -125,7 +125,8 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
         return pd.Series(True, index=df.index), pd.Series(False, index=df.index)
 
     rolls = df[roll_col].astype(str).str.strip()
-    # Minimum length 8 is required because we parse roll[3:6] (course code) and roll[6:8] (two-digit entry year).
+    # Minimum length 8 is required because this logic expects roll format with:
+    # [3:6] => course code, [6:8] => admission-year token.
     valid_rolls = rolls[rolls.str.len() >= 8]
 
     # Default: do not penalize rows that cannot be reliably parsed.
@@ -137,7 +138,7 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
 
     parsed = pd.DataFrame(index=valid_rolls.index)
     parsed["ROLL_COURSE"] = valid_rolls.str[3:6]
-    parsed["ENTRY_YEAR"] = pd.to_numeric(valid_rolls.str[6:8], errors="coerce")
+    parsed["ENTRY_YEAR"] = valid_rolls.apply(infer_academic_year_from_roll)
     parsed = parsed.dropna(subset=["ENTRY_YEAR"])
 
     if parsed.empty:
@@ -155,8 +156,10 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
             df["COURSE CODE"]
             .astype(str)
             .str.strip()
+            .replace({"": pd.NA})
+            .dropna()
             .str.upper()
-            .replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "NULL": pd.NA})
+            .replace({"NAN": pd.NA, "NONE": pd.NA, "NULL": pd.NA})
             .dropna()
         )
         if not course_code_series.empty:
