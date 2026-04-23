@@ -125,8 +125,8 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
         return pd.Series(True, index=df.index), pd.Series(False, index=df.index)
 
     rolls = df[roll_col].astype(str).str.strip()
-    # Minimum length 8 is required because this logic expects roll format with:
-    # [3:6] => course code, [6:8] => admission-year token.
+    # Minimum length 8 is required because this logic expects roll format where:
+    # [0:3] is a prefix/institute token, [3:6] is course code, [6:8] is admission-year token.
     valid_rolls = rolls[rolls.str.len() >= 8]
 
     # Default: do not penalize rows that cannot be reliably parsed.
@@ -166,6 +166,9 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
             course_mode = course_code_series.mode()
             if not course_mode.empty:
                 target_course = str(course_mode.iloc[0])
+
+    if not target_course:
+        return current_class_mask, old_batch_mask
 
     parsed = parsed[parsed["ROLL_COURSE"] == target_course]
     if parsed.empty:
