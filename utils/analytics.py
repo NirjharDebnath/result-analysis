@@ -125,6 +125,7 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
         return pd.Series(True, index=df.index), pd.Series(False, index=df.index)
 
     rolls = df[roll_col].astype(str).str.strip()
+    # Minimum length 8 is required because we parse roll[3:6] (course) and roll[6:8] (entry year).
     valid_rolls = rolls[rolls.str.len() >= 8]
 
     # Default: do not penalize rows that cannot be reliably parsed.
@@ -145,6 +146,10 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     parsed["ENTRY_YEAR"] = parsed["ENTRY_YEAR"].astype(int)
 
     # Prefer COURSE CODE column when present so we don't rely solely on roll slices.
+    roll_course_mode = parsed["ROLL_COURSE"].mode()
+    fallback_course = str(roll_course_mode.iloc[0]) if not roll_course_mode.empty else ""
+    target_course = fallback_course
+
     if "COURSE CODE" in df.columns:
         course_code_series = (
             df["COURSE CODE"]
@@ -153,9 +158,10 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
             .replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA})
             .dropna()
         )
-        target_course = str(course_code_series.mode().iloc[0]) if not course_code_series.empty else str(parsed["ROLL_COURSE"].mode().iloc[0])
-    else:
-        target_course = str(parsed["ROLL_COURSE"].mode().iloc[0])
+        if not course_code_series.empty:
+            course_mode = course_code_series.mode()
+            if not course_mode.empty:
+                target_course = str(course_mode.iloc[0])
 
     parsed = parsed[parsed["ROLL_COURSE"].astype(str) == target_course]
     if parsed.empty:
@@ -165,7 +171,7 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     top_count = year_counts.max()
     tied_top_years = year_counts[year_counts == top_count].index
     # Tie-break toward the latest admission year to avoid pulling older repeating cohorts as "current".
-    regular_year = int(max(tied_top_years))
+    regular_year = int(tied_top_years.max())
 
     is_regular = (parsed["ENTRY_YEAR"] == regular_year)
     is_lateral = (parsed["ENTRY_YEAR"] == regular_year + 1)
