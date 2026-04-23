@@ -153,6 +153,18 @@ def plot_semester_metric_bars(
     selected_groups: Optional[List[str]] = None,
     title: Optional[str] = None,
 ):
+    # Autumn colour palette — one distinct colour per comparison group
+    AUTUMN_PALETTE = [
+        "#D35400",  # Burnt Orange
+        "#F4A261",  # Sandy Orange
+        "#E76F51",  # Terra Cotta
+        "#9C3F0F",  # Dark Rust
+        "#FAD6A5",  # Light Peach
+        "#C0392B",  # Deep Red
+        "#F0B429",  # Amber
+        "#2E4053",  # Deep Slate (contrast anchor)
+    ]
+
     fig, ax = plt.subplots(figsize=(10, 4.5))
     fig.patch.set_facecolor(THEME["bg"])
     ax.set_facecolor(THEME["bg"])
@@ -171,11 +183,16 @@ def plot_semester_metric_bars(
         ax.set_title(title or f"{metric} Comparison", fontweight="bold")
         return fig
 
+    # Sort bars by semester order then group label
+    sort_cols = ["SEMESTER_ORDER", "GROUP_LABEL"] if "SEMESTER_ORDER" in metric_df.columns else ["GROUP_LABEL"]
+    metric_df = metric_df.sort_values(sort_cols)
+
     x_labels = metric_df["GROUP_LABEL"].astype(str).tolist()
     y_vals = metric_df["AVG_VALUE"].astype(float).tolist()
     counts = metric_df["STUDENT_COUNT"].astype(int).tolist()
+    colors = [AUTUMN_PALETTE[i % len(AUTUMN_PALETTE)] for i in range(len(x_labels))]
 
-    bars = ax.bar(x_labels, y_vals, color=THEME["secondary"], edgecolor="black", alpha=0.85)
+    bars = ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.85)
     for bar, count, y in zip(bars, counts, y_vals):
         ax.annotate(
             f"{y:.2f}\n(n={count})",
@@ -187,10 +204,10 @@ def plot_semester_metric_bars(
             fontsize=8,
         )
 
-    ax.set_title(title or f"{metric} Comparison Across Semesters", fontweight="bold")
+    ax.set_title(title or f"{metric} — Average Comparison", fontweight="bold")
     ax.set_ylabel(f"Average {metric}")
-    ax.set_xlabel("Semester Group")
-    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Group")
+    ax.set_ylim(bottom=0, top=(max(y_vals) * 1.2) if y_vals else 10)
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)

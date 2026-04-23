@@ -2,9 +2,9 @@
 import pandas as pd
 import numpy as np
 import re
-from typing import Optional
+from typing import List, Optional
 from scipy.stats import skew
-from utils.processor import parse_grade_value
+from utils.processor import parse_grade_value, normalize_token
 
 SEMESTER_WORD_TO_NUM = {
     "FIRST": 1, "1ST": 1, "ONE": 1, "I": 1,
@@ -21,6 +21,8 @@ SEMESTER_WORD_TO_NUM = {
 # Assumes roll format like XXXCCCYYNNN..., where YY is the two-digit admission year at indices [6:8].
 ROLL_YEAR_START_INDEX = 6
 ROLL_YEAR_END_INDEX = 8
+# Sentinel value used throughout to indicate "semester order unknown / unparseable".
+UNKNOWN_SEMESTER_ORDER = 999
 
 def normalize_semester_label(semester_value: object) -> str:
     text = str(semester_value).strip() if semester_value is not None else ""
@@ -44,7 +46,7 @@ def get_semester_order(semester_value: object) -> int:
     number_match = re.search(r"\b(\d{1,2})\b", label)
     if number_match:
         return int(number_match.group(1))
-    return 999
+    return UNKNOWN_SEMESTER_ORDER
 
 def infer_academic_year_from_roll(roll_value: object) -> Optional[int]:
     roll = str(roll_value).strip()
@@ -116,6 +118,139 @@ def aggregate_gpa_comparison(df: pd.DataFrame, gpa_columns: list) -> pd.DataFram
     if result_df.empty:
         return result_df
     return result_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR", "GROUP_LABEL", "METRIC"], na_position="last").reset_index(drop=True)
+
+def get_primary_sgpa_col(file_df: pd.DataFrame, sem_order: int) -> Optional[str]:
+    """
+    Return the column name holding the current-semester SGPA for a group of students.
+
+    Priority:
+    1. ``SGPA{sem_order}`` (even-sem files store per-sem GPAs as SGPA3/SGPA4, SGPA7/SGPA8, …)
+    2. Plain ``SGPA`` column (odd-sem files use a single SGPA column)
+    3. Any column whose normalised name contains ``SGPA`` and has numeric data
+
+    Returns ``None`` when no suitable column can be found.
+    ``sem_order=UNKNOWN_SEMESTER_ORDER`` (999) skips step 1 and falls through to steps 2–3.
+    """
+    # Try SGPA{N} (even-sem files store previous+current sem SGPAs as SGPA3/SGPA4, SGPA7/SGPA8, …)
+    if sem_order != UNKNOWN_SEMESTER_ORDER:
+        candidate = f"SGPA{sem_order}"
+        col_upper = {c.upper(): c for c in file_df.columns}
+        if candidate.upper() in col_upper:
+            col = col_upper[candidate.upper()]
+            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
+                return col
+    # Plain SGPA (odd-sem files)
+    for col in file_df.columns:
+        if normalize_token(col) == "SGPA":
+            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
+                return col
+    # Fall back to any SGPA-like column with data
+    for col in file_df.columns:
+        if "SGPA" in normalize_token(col):
+            if pd.to_numeric(file_df[col], errors="coerce").notna().any():
+                return col
+    return None
+
+
+def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.DataFrame:
+    """
+    Builds comparison data for the semester comparison page.
+
+    Groups students by SOURCE FILE (one group per uploaded file) and computes the
+    average of each GPA metric.  Does NOT use roll-number admission-year logic to
+    split students — all students from the same course in the same file are treated
+    as one group.
+
+    Group labels:
+    - Same semester across files → labelled by EXAM SESSION (e.g. "April 2025")
+    - Different semesters → labelled by semester name (e.g. "Semester 4")
+    - Both differ → "Semester N | Month YYYY"
+
+    Returns a DataFrame with columns:
+        GROUP_LABEL, SEMESTER_LABEL, SEMESTER_ORDER, METRIC, AVG_VALUE, STUDENT_COUNT
+    """
+    if df.empty or not gpa_columns:
+        return pd.DataFrame()
+
+    working = df.copy()
+
+    # Normalise semester
+    if "SEMESTER" in working.columns:
+        working["SEMESTER_LABEL"] = working["SEMESTER"].apply(normalize_semester_label)
+        working["SEMESTER_ORDER"] = working["SEMESTER_LABEL"].apply(get_semester_order)
+    else:
+        working["SEMESTER_LABEL"] = "Unknown Semester"
+        working["SEMESTER_ORDER"] = UNKNOWN_SEMESTER_ORDER
+
+    if "SOURCE FILE" not in working.columns:
+        working["SOURCE FILE"] = "Uploaded File"
+    if "EXAM SESSION" not in working.columns:
+        working["EXAM SESSION"] = ""
+
+    # Per-file dominant semester and exam-session
+    file_meta = (
+        working.groupby("SOURCE FILE", sort=False)
+        .agg(
+            SEM_LABEL=("SEMESTER_LABEL", lambda x: x.mode().iloc[0] if not x.mode().empty else "Unknown"),
+            EXAM_SESS=("EXAM SESSION", lambda x: x.mode().iloc[0] if not x.mode().empty else ""),
+            SEM_ORDER=("SEMESTER_ORDER", lambda x: int(x.mode().iloc[0]) if not x.mode().empty else UNKNOWN_SEMESTER_ORDER),
+        )
+        .reset_index()
+    )
+
+    all_same_sem = file_meta["SEM_LABEL"].nunique() == 1
+    all_same_exam = file_meta["EXAM_SESS"].replace("", pd.NA).dropna().nunique() <= 1
+
+    def make_label(row):
+        sem = row["SEM_LABEL"]
+        exam = str(row["EXAM_SESS"]).strip()
+        if all_same_sem:
+            # Distinguish files by exam session only
+            return exam if exam else sem
+        elif all_same_exam or not exam:
+            # Distinguish files by semester only
+            return sem
+        else:
+            return f"{sem} | {exam}"
+
+    file_meta["GROUP_LABEL"] = file_meta.apply(make_label, axis=1)
+
+    # Merge group labels back into working df
+    working = working.merge(
+        file_meta[["SOURCE FILE", "GROUP_LABEL", "SEM_LABEL", "SEM_ORDER"]],
+        on="SOURCE FILE",
+        how="left",
+    )
+
+    rows = []
+    for metric in gpa_columns:
+        if metric not in working.columns:
+            continue
+        metric_df = working[["GROUP_LABEL", "SEM_LABEL", "SEM_ORDER", metric]].copy()
+        metric_df["METRIC_VALUE"] = pd.to_numeric(metric_df[metric], errors="coerce")
+        summary = (
+            metric_df.dropna(subset=["METRIC_VALUE"])
+            .groupby(["GROUP_LABEL", "SEM_LABEL", "SEM_ORDER"])["METRIC_VALUE"]
+            .agg(["mean", "count"])
+            .reset_index()
+        )
+        for _, row in summary.iterrows():
+            rows.append(
+                {
+                    "GROUP_LABEL": str(row["GROUP_LABEL"]),
+                    "SEMESTER_LABEL": str(row["SEM_LABEL"]),
+                    "SEMESTER_ORDER": int(row["SEM_ORDER"]) if pd.notna(row["SEM_ORDER"]) else UNKNOWN_SEMESTER_ORDER,
+                    "METRIC": metric,
+                    "AVG_VALUE": round(float(row["mean"]), 3),
+                    "STUDENT_COUNT": int(row["count"]),
+                }
+            )
+
+    result = pd.DataFrame(rows)
+    if result.empty:
+        return result
+    return result.sort_values(["SEMESTER_ORDER", "GROUP_LABEL", "METRIC"]).reset_index(drop=True)
+
 
 def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     """
