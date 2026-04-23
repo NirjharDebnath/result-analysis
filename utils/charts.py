@@ -4,6 +4,7 @@ import seaborn as sns
 import numpy as np
 from scipy.stats import norm
 import pandas as pd
+from typing import Optional, List
 from utils.constants import SOFT_COLORS
 
 # Cool color theme requested
@@ -143,6 +144,57 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None, titl
     ax.set_ylabel("Density")
     ax.legend()
     ax.grid(axis="y", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    return fig
+
+def plot_semester_metric_bars(
+    comparison_df: pd.DataFrame,
+    metric: str,
+    selected_groups: Optional[List[str]] = None,
+    title: Optional[str] = None,
+):
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    fig.patch.set_facecolor(THEME["bg"])
+    ax.set_facecolor(THEME["bg"])
+
+    if comparison_df.empty or "METRIC" not in comparison_df.columns:
+        ax.text(0.5, 0.5, "No comparison data available", ha="center", va="center")
+        ax.set_title(title or f"{metric} Comparison", fontweight="bold")
+        return fig
+
+    metric_df = comparison_df[comparison_df["METRIC"] == metric].copy()
+    if selected_groups:
+        metric_df = metric_df[metric_df["GROUP_LABEL"].isin(selected_groups)].copy()
+
+    if metric_df.empty:
+        ax.text(0.5, 0.5, "No data for selected groups", ha="center", va="center")
+        ax.set_title(title or f"{metric} Comparison", fontweight="bold")
+        return fig
+
+    x_labels = metric_df["GROUP_LABEL"].astype(str).tolist()
+    y_vals = metric_df["AVG_VALUE"].astype(float).tolist()
+    counts = metric_df["STUDENT_COUNT"].astype(int).tolist()
+
+    bars = ax.bar(x_labels, y_vals, color=THEME["secondary"], edgecolor="black", alpha=0.85)
+    for bar, count, y in zip(bars, counts, y_vals):
+        ax.annotate(
+            f"{y:.2f}\n(n={count})",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    ax.set_title(title or f"{metric} Comparison Across Semesters", fontweight="bold")
+    ax.set_ylabel(f"Average {metric}")
+    ax.set_xlabel("Semester Group")
+    ax.set_ylim(bottom=0)
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.xticks(rotation=15, ha="right")
     plt.tight_layout()
     return fig
 

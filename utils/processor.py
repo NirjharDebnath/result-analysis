@@ -137,6 +137,19 @@ def clean_uploaded_data(df: pd.DataFrame) -> pd.DataFrame:
         df = df[roll_series != "ROLL NO"]
     return df.dropna(how="all").reset_index(drop=True)
 
+def deduplicate_exact_rows(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
+    if df.empty:
+        return df.copy(), 0
+
+    canonical = df.copy()
+    for col in canonical.columns:
+        canonical[col] = canonical[col].fillna("").astype(str).str.strip()
+
+    duplicate_mask = canonical.duplicated(keep="first")
+    duplicate_count = int(duplicate_mask.sum())
+    deduped_df = df.loc[~duplicate_mask].copy().reset_index(drop=True)
+    return deduped_df, duplicate_count
+
 def is_metadata_column(col: str) -> bool:
     token = normalize_token(col)
     if col in KNOWN_NON_SUBJECT_COLUMNS:
@@ -242,6 +255,8 @@ def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
         raise ValueError("No valid student rows found across uploaded files.")
 
     combined_df = pd.concat(datasets, ignore_index=True)
+    combined_df, duplicate_count = deduplicate_exact_rows(combined_df)
+    combined_df.attrs["dropped_duplicate_rows"] = duplicate_count
     return combined_df
 
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):

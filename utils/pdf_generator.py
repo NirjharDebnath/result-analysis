@@ -2,8 +2,9 @@
 import os
 import tempfile
 import pandas as pd
+from typing import Optional, List
 from fpdf import FPDF
-from utils.charts import plot_status_bars, plot_normal_curve
+from utils.charts import plot_status_bars, plot_normal_curve, plot_semester_metric_bars
 from utils.processor import parse_grade_value
 
 class MasterReport(FPDF):
@@ -28,7 +29,10 @@ class MasterReport(FPDF):
 
 def generate_master_pdf(course_name: str, semester: str, df: pd.DataFrame, 
                         valid_subjects: list, stats_df: pd.DataFrame, 
-                        current_class_mask: pd.Series) -> bytes:
+                        current_class_mask: pd.Series,
+                        comparison_df: Optional[pd.DataFrame] = None,
+                        comparison_metrics: Optional[List[str]] = None,
+                        comparison_groups: Optional[List[str]] = None) -> bytes:
     
     pdf = MasterReport(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -140,6 +144,34 @@ def generate_master_pdf(course_name: str, semester: str, df: pd.DataFrame,
                 
                 pos_index = idx % 2
                 pdf.image(tmp.name, x=40, y=y_positions[pos_index], w=130) # Centered and smaller width
+
+        if comparison_df is not None and not comparison_df.empty and comparison_metrics:
+            for metric in comparison_metrics:
+                metric_data = comparison_df[comparison_df["METRIC"] == metric]
+                if comparison_groups:
+                    metric_data = metric_data[metric_data["GROUP_LABEL"].isin(comparison_groups)]
+                if metric_data.empty:
+                    continue
+
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_text_color(211, 84, 0)
+                pdf.cell(0, 10, f"4. Semester Comparison - {metric}", new_x="LMARGIN", new_y="NEXT")
+                pdf.set_font("Helvetica", "I", 10)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 6, "Average GPA values across selected semester groups", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(4)
+
+                fig_cmp = plot_semester_metric_bars(
+                    comparison_df=comparison_df,
+                    metric=metric,
+                    selected_groups=comparison_groups,
+                    title=f"{metric} Comparison",
+                )
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                    fig_cmp.savefig(tmp.name, bbox_inches='tight', dpi=150)
+                    temp_files.append(tmp.name)
+                    pdf.image(tmp.name, x=18, w=174)
 
         return bytes(pdf.output())
 

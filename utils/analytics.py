@@ -1,8 +1,109 @@
 # utils/analytics.py
 import pandas as pd
 import numpy as np
+import re
+from typing import Optional
 from scipy.stats import skew
 from utils.processor import parse_grade_value
+
+SEMESTER_WORD_TO_NUM = {
+    "FIRST": 1, "1ST": 1, "ONE": 1, "I": 1,
+    "SECOND": 2, "2ND": 2, "TWO": 2, "II": 2,
+    "THIRD": 3, "3RD": 3, "THREE": 3, "III": 3,
+    "FOURTH": 4, "4TH": 4, "FOUR": 4, "IV": 4,
+    "FIFTH": 5, "5TH": 5, "FIVE": 5, "V": 5,
+    "SIXTH": 6, "6TH": 6, "SIX": 6, "VI": 6,
+    "SEVENTH": 7, "7TH": 7, "SEVEN": 7, "VII": 7,
+    "EIGHTH": 8, "8TH": 8, "EIGHT": 8, "VIII": 8,
+    "NINTH": 9, "9TH": 9, "NINE": 9, "IX": 9,
+    "TENTH": 10, "10TH": 10, "TEN": 10, "X": 10,
+}
+
+def normalize_semester_label(semester_value: object) -> str:
+    text = str(semester_value).strip() if semester_value is not None else ""
+    if not text:
+        return "Unknown Semester"
+    upper_text = text.upper()
+
+    number_match = re.search(r"\b(\d{1,2})\b", upper_text)
+    if number_match:
+        sem_num = int(number_match.group(1))
+        return f"Semester {sem_num}"
+
+    for token, sem_num in SEMESTER_WORD_TO_NUM.items():
+        if re.search(rf"\b{re.escape(token)}\b", upper_text):
+            return f"Semester {sem_num}"
+
+    return text
+
+def get_semester_order(semester_value: object) -> int:
+    label = normalize_semester_label(semester_value).upper()
+    number_match = re.search(r"\b(\d{1,2})\b", label)
+    if number_match:
+        return int(number_match.group(1))
+    return 999
+
+def infer_academic_year_from_roll(roll_value: object) -> Optional[int]:
+    roll = str(roll_value).strip()
+    if len(roll) < 8:
+        return None
+    year_token = roll[6:8]
+    if not year_token.isdigit():
+        return None
+    year_num = int(year_token)
+    return 2000 + year_num
+
+def build_semester_year_groups(df: pd.DataFrame, semester_col: str = "SEMESTER", roll_col: str = "ROLL NO") -> pd.DataFrame:
+    frame = df.copy()
+    frame["SEMESTER_LABEL"] = frame.get(semester_col, pd.Series(index=frame.index, dtype=object)).apply(normalize_semester_label)
+    frame["SEMESTER_ORDER"] = frame["SEMESTER_LABEL"].apply(get_semester_order)
+    frame["ACADEMIC_YEAR"] = frame.get(roll_col, pd.Series(index=frame.index, dtype=object)).apply(infer_academic_year_from_roll)
+
+    has_year_split = frame["ACADEMIC_YEAR"].notna().sum() > 0 and frame.groupby("SEMESTER_LABEL")["ACADEMIC_YEAR"].nunique(dropna=True).max() > 1
+    if has_year_split:
+        frame["GROUP_LABEL"] = frame.apply(
+            lambda row: f"{row['SEMESTER_LABEL']} | AY {int(row['ACADEMIC_YEAR'])}" if pd.notna(row["ACADEMIC_YEAR"]) else f"{row['SEMESTER_LABEL']} | AY Unknown",
+            axis=1,
+        )
+    else:
+        frame["GROUP_LABEL"] = frame["SEMESTER_LABEL"]
+
+    return frame
+
+def aggregate_gpa_comparison(df: pd.DataFrame, gpa_columns: list) -> pd.DataFrame:
+    if df.empty or not gpa_columns:
+        return pd.DataFrame()
+
+    grouped_df = build_semester_year_groups(df)
+    rows = []
+    for metric in gpa_columns:
+        if metric not in grouped_df.columns:
+            continue
+        working = grouped_df[["SEMESTER_LABEL", "SEMESTER_ORDER", "ACADEMIC_YEAR", "GROUP_LABEL", metric]].copy()
+        working["METRIC_VALUE"] = pd.to_numeric(working[metric], errors="coerce")
+        summary = (
+            working.dropna(subset=["METRIC_VALUE"])
+            .groupby(["SEMESTER_LABEL", "SEMESTER_ORDER", "ACADEMIC_YEAR", "GROUP_LABEL"], dropna=False)["METRIC_VALUE"]
+            .agg(["mean", "count"])
+            .reset_index()
+        )
+        for _, row in summary.iterrows():
+            rows.append(
+                {
+                    "SEMESTER_LABEL": row["SEMESTER_LABEL"],
+                    "SEMESTER_ORDER": int(row["SEMESTER_ORDER"]) if pd.notna(row["SEMESTER_ORDER"]) else 999,
+                    "ACADEMIC_YEAR": int(row["ACADEMIC_YEAR"]) if pd.notna(row["ACADEMIC_YEAR"]) else None,
+                    "GROUP_LABEL": row["GROUP_LABEL"],
+                    "METRIC": metric,
+                    "AVG_VALUE": round(float(row["mean"]), 3),
+                    "STUDENT_COUNT": int(row["count"]),
+                }
+            )
+
+    result_df = pd.DataFrame(rows)
+    if result_df.empty:
+        return result_df
+    return result_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR", "GROUP_LABEL", "METRIC"], na_position="last").reset_index(drop=True)
 
 def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     """
