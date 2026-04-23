@@ -242,8 +242,6 @@ def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
         raise ValueError("No valid student rows found across uploaded files.")
 
     combined_df = pd.concat(datasets, ignore_index=True)
-    if combined_df.empty:
-        raise ValueError("No valid student rows found across uploaded files.")
     return combined_df
 
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
