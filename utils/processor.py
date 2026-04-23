@@ -238,6 +238,8 @@ def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
 
     if file_errors:
         raise ValueError("One or more files failed to process:\n- " + "\n- ".join(file_errors))
+    if not datasets:
+        raise ValueError("No valid student rows found across uploaded files.")
 
     combined_df = pd.concat(datasets, ignore_index=True)
     if combined_df.empty:
