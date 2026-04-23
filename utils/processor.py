@@ -228,17 +228,18 @@ def read_uploaded_datasets(uploaded_files) -> pd.DataFrame:
     datasets: List[pd.DataFrame] = []
     file_errors: List[str] = []
 
+    expected_errors = (ValueError, pd.errors.ParserError, UnicodeDecodeError, OSError)
     for uploaded_file in files:
         try:
             datasets.append(read_uploaded_dataset(uploaded_file))
-        except Exception as exc:
+        except expected_errors as exc:
             file_name = getattr(uploaded_file, "name", "Unknown file")
             file_errors.append(f"{file_name}: {exc}")
 
     if file_errors:
         raise ValueError("One or more files failed to process:\n- " + "\n- ".join(file_errors))
 
-    combined_df = pd.concat(datasets, ignore_index=True, sort=False)
+    combined_df = pd.concat(datasets, ignore_index=True)
     if combined_df.empty:
         raise ValueError("No valid student rows found across uploaded files.")
     return combined_df
