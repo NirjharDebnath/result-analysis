@@ -248,25 +248,25 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
 
     expected_errors = (ValueError, pd.errors.ParserError, UnicodeDecodeError, OSError)
     for uploaded_file in files:
+        file_name = str(getattr(uploaded_file, "name", "Unknown file")).strip()
         try:
             file_df = read_uploaded_dataset(uploaded_file)
-            file_name = str(getattr(uploaded_file, "name", "Unknown file")).strip()
             file_df["SOURCE FILE"] = file_name
 
             session_meta = (exam_session_by_file or {}).get(file_name, {})
             exam_month = str(session_meta.get("EXAM MONTH", "")).strip()
             exam_year = pd.to_numeric(session_meta.get("EXAM YEAR"), errors="coerce")
+            exam_year_int = int(exam_year) if pd.notna(exam_year) else None
 
             file_df["EXAM MONTH"] = exam_month if exam_month else ""
-            file_df["EXAM YEAR"] = int(exam_year) if pd.notna(exam_year) else pd.NA
+            file_df["EXAM YEAR"] = exam_year_int if exam_year_int is not None else pd.NA
             file_df["EXAM SESSION"] = (
-                f"{exam_month} {int(exam_year)}".strip()
-                if exam_month and pd.notna(exam_year)
+                f"{exam_month} {exam_year_int}".strip()
+                if exam_month and exam_year_int is not None
                 else ""
             )
             datasets.append(file_df)
         except expected_errors as exc:
-            file_name = getattr(uploaded_file, "name", "Unknown file")
             file_errors.append(f"{file_name}: {exc}")
 
     if file_errors:

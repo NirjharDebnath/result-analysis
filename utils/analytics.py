@@ -194,6 +194,7 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
     semester_order = get_semester_order(semester_name)
+    # get_semester_order returns 999 when semester text cannot be parsed into a numeric order.
     expected_elapsed_years = max(0, (semester_order - 1) // 2) if semester_order != 999 else None
     
     current_class_mask, _ = get_class_masks(df)
@@ -222,8 +223,12 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
         if pd.isna(exam_year) or admission_year is None or expected_elapsed_years is None:
             timeline_statuses.append("Unknown")
         else:
-            elapsed_years = int(exam_year) - int(admission_year)
-            if elapsed_years <= expected_elapsed_years:
+            elapsed_years = exam_year - admission_year
+            if elapsed_years < 0:
+                timeline_statuses.append("Unknown")
+            # expected_elapsed_years is the normal admission-to-exam gap for the selected semester.
+            # same/less => current cohort, +1 => older (past year), beyond +1 => reappearing backlog.
+            elif elapsed_years <= expected_elapsed_years:
                 timeline_statuses.append("Current Year Students")
             elif elapsed_years == expected_elapsed_years + 1:
                 timeline_statuses.append("Past Year Students")

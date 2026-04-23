@@ -1,6 +1,6 @@
 # app.py
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone
 from utils.constants import COLLEGE_NAME
 from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
 from utils.analytics import build_semester_year_groups
@@ -34,8 +34,9 @@ if uploaded_files:
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December",
         ]
-        current_year = datetime.utcnow().year
-        current_month_index = datetime.utcnow().month - 1
+        now_utc = datetime.now(timezone.utc)
+        current_year = now_utc.year
+        current_month_index = now_utc.month - 1
 
         exam_session_by_file = {}
         with st.expander("🗓️ Exam Month/Year per Uploaded File", expanded=True):
