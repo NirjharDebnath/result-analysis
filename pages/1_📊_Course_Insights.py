@@ -4,9 +4,9 @@ import streamlit as st
 from utils.constants import COLLEGE_NAME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer
-from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, aggregate_gpa_comparison
-from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution, plot_semester_metric_bars
-from utils.pdf_generator import generate_master_pdf
+from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores
+from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution
+from utils.pdf_generator import create_master_report_pdf
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
 
@@ -31,15 +31,8 @@ st.markdown("""
         white-space: normal !important;
         word-wrap: break-word !important;
     }
-    <style>
-    div[data-baseweb="select"] > div {
-        white-space: normal !important;
-        word-wrap: break-word !important;
-    }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
 render_sidebar_branding()
 st.header(COLLEGE_NAME)
@@ -55,21 +48,18 @@ if data:
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
 
-    # --- THE FIX: BULLETPROOF SUBJECT FILTER ---
+    # --- SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
     valid_subjects = []
     
     for c in all_subject_cols:
         if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
-            # We use our own parser to check if there's any actual grade data in this column
             has_real_data = False
             for val in filtered_df[c].dropna():
                 grade, marks = parse_grade_value(val)
-                # If parse_grade_value successfully extracts a grade or a mark, it's a real subject!
                 if grade is not None or marks is not None:
                     has_real_data = True
                     break
-            
             if has_real_data:
                 valid_subjects.append(c)
 
@@ -80,33 +70,77 @@ if data:
     filtered_df = determine_student_status(filtered_df, selected_semester)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
+    # --- CALCULATE PASS PERCENTAGES & CORE METRICS ---
+    total_students = len(filtered_df)
+    current_pass = len(filtered_df[filtered_df["STATUS"] == "Current Batch"])
+    current_backlog = len(filtered_df[filtered_df["STATUS"] == "Backlog (Current Batch)"])
+    total_current = current_pass + current_backlog
+    
+    current_pass_pct = (current_pass / total_current * 100) if total_current > 0 else 0
+    old_batch_count = len(filtered_df[filtered_df["STATUS"] == "Old Batch (Re-appearing)"])
+
+    # --- PRE-GENERATE FIGURES FOR UI & PDF ---
+    status_fig = plot_status_bars(filtered_df["STATUS"].value_counts(), total_students)
+    stats_df = calculate_subject_stats(filtered_df, valid_subjects)
+
+    # 🧮 DYNAMICALLY INJECT PASS PERCENTAGE INTO THE TABLE
+    if not stats_df.empty and all(g in stats_df.columns for g in ['O', 'E', 'A', 'B', 'C', 'D', 'F']):
+        total_graded = stats_df[['O', 'E', 'A', 'B', 'C', 'D', 'F']].sum(axis=1)
+        passed = total_graded - stats_df['F']
+        pass_pct = (passed / total_graded * 100).fillna(0).map(lambda x: f"{x:.1f}%")
+        
+        if "Skewness" in stats_df.columns:
+            loc = stats_df.columns.get_loc("Skewness") + 1
+            stats_df.insert(loc, "Pass %", pass_pct)
+        else:
+            stats_df["Pass %"] = pass_pct
+
+    gpa_curve_fig = None
+    subject_curve_fig = None
+    z_summary_df = pd.DataFrame()
+
     tab1, tab2, tab3, tab4 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves", "📥 Export PDF"])
 
     with tab1:
-        st.subheader("Batch Overview")
-        st.info("💡 **What this shows:** A high-level view separating the current batch (Regular + Laterals) from older batch students reappearing for exams.")
+        st.subheader("Batch Overview & Pass Rates")
+        
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Evaluated", total_students)
+        m2.metric("Current Batch Size", total_current)
+        m3.metric("Current Batch Pass %", f"{current_pass_pct:.1f}%")
+        m4.metric("Old Batch (Re-appearing)", old_batch_count)
+        
+        st.divider()
+
         col1, col2 = st.columns([1.5, 1])
         with col1:
-            st.pyplot(plot_status_bars(filtered_df["STATUS"].value_counts()), width='stretch')
+            st.pyplot(status_fig, use_container_width=True)
 
         with col2:
-            st.write("**Tabular Result Summary**")
-            total_students = len(filtered_df)
-            summary_data = [{"Status": status, "Count": count, "Percentage": f"{(count / total_students * 100):.1f}%"} for status, count in filtered_df["STATUS"].value_counts().items()]
-            st.dataframe(pd.DataFrame(summary_data), hide_index=True, width='stretch')
-            st.divider()
-            st.write(f"🎓 **Total Evaluated:** {total_students}")
-            st.write(f"🍁 **Current Batch (Regular + Lateral):** {current_class_mask.sum()}")
-            st.write(f"🍂 **Old Batch (Re-appearing):** {old_batch_mask.sum()}")
-            if "EXAM TIMELINE" in filtered_df.columns:
-                st.divider()
-                st.write("🗓️ **Exam Timeline Split**")
-                for timeline, count in filtered_df["EXAM TIMELINE"].value_counts().items():
-                    st.write(f"• {timeline}: {count}")
+            st.write("**Detailed Status Breakdown**")
+            summary_data = []
+            for s, c in filtered_df["STATUS"].value_counts().items():
+                display_name = s
+                if s == "Current Batch": display_name = "Current Batch (All Clear)"
+                if s == "Backlog (Current Batch)": display_name = "Current Batch (Backlogs)"
+                
+                summary_data.append({
+                    "Status Category": display_name, 
+                    "Count": c, 
+                    "% of Class": f"{(c/total_students*100):.1f}%"
+                })
+            st.dataframe(pd.DataFrame(summary_data), hide_index=True, use_container_width=True)
+            
+            st.write("") 
+            if current_pass_pct >= 90:
+                st.success(f"🌟 **Excellent Performance:** The current batch has a highly successful pass rate of {current_pass_pct:.1f}%.")
+            elif current_pass_pct < 60:
+                st.error(f"⚠️ **Attention Needed:** The current batch pass rate is only {current_pass_pct:.1f}%. Many students have backlogs.")
+            else:
+                st.warning(f"📊 **Average Performance:** The current batch pass rate is {current_pass_pct:.1f}%.")
 
     with tab2:
         st.subheader("Consolidated Result Matrix")
-        stats_df = calculate_subject_stats(filtered_df, valid_subjects)
         if not stats_df.empty:
             st.dataframe(stats_df, width='stretch', hide_index=True)
             if "Skewness" in stats_df.columns:
@@ -117,8 +151,6 @@ if data:
 
     with tab3:
         st.subheader("Statistical Bell Curves")
-        st.info("💡 **What this shows:** The Normal Distribution of marks/GPAs. The orange line isolates your Current Batch, while the shaded area shows the whole class.")
-
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
 
@@ -134,7 +166,8 @@ if data:
                 selected_gpa = st.selectbox("Select GPA Metric", gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
-                st.pyplot(plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False), width='stretch')
+                gpa_curve_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
+                st.pyplot(gpa_curve_fig, width='stretch')
 
         with col_subj:
             if valid_subjects:
@@ -149,7 +182,8 @@ if data:
                 else:
                     reg_subj = None
 
-                st.pyplot(plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True), width='stretch')
+                subject_curve_fig = plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True)
+                st.pyplot(subject_curve_fig, width='stretch')
 
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
@@ -162,98 +196,95 @@ if data:
 
         if target_col:
             st.markdown(f"#### 🔍 Z-Score Analysis for: **{target_col}**")
-            st.caption("Identifies students significantly above or below the class average based on Standard Deviations (\u03c3). Z-Score > 1 means excellent performance; Z-Score < -1 means struggling performance.")
             try:
                 z_df = calculate_z_scores(display_df, target_col)
-                
                 if not z_df.empty:
-                    # Make a copy for display so we don't overwrite the original columns we need
-                    z_summary = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
-                    z_summary.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
-                    st.dataframe(z_summary, width='stretch', hide_index=True)
-                    # st.pyplot(
-                    #     plot_z_score_distribution(z_df, title=f"{target_col} Z-Score Distribution"),
-                    #     width="content",
-                    # )
+                    z_summary_df = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
+                    z_summary_df.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
+                    st.dataframe(z_summary_df, width='stretch', hide_index=True)
 
                     st.write("") 
                     c_top, c_worst = st.columns(2)
                     if len(z_df) > 0:
-                        # --- THE FIX: We use the original z_df column names here, which prevents the KeyError crash! ---
                         c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
                         c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
                 else:
                     st.warning(f"Not enough valid numerical data to calculate Z-Scores for {target_col}.")
-                    
             except Exception as e:
                 st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
-                
-    # ... (Keep your existing tab1, tab2, tab3 code here) ...
 
     with tab4:
         st.subheader("📥 Export Master PDF Report")
-        st.info("💡 **What this does:** Compiles the Executive Summary, the Statistical Matrix, and generates bell curves for **every single valid subject** in the background. It organizes them neatly into a printable academic document.")
+        st.info("💡 **What this does:** Compiles the Executive Summary, the FULL Statistical Matrix, background-generates distribution curves for **every valid subject**, includes the Z-Score Table, and optionally attaches the Semester Comparison graph.")
         
-        # We need the course name string for the PDF title
         course_name_string = str(course_df["COURSENAME"].iloc[0]) if not course_df.empty else "Unknown Course"
-        comparison_source_gpas = get_gpa_columns(course_df)
-        comparison_df = aggregate_gpa_comparison(course_df, comparison_source_gpas)
-        comparison_available = not comparison_df.empty and comparison_df["GROUP_LABEL"].nunique() > 1
-
-        include_comparison_graphs = st.checkbox(
-            "Include semester/year comparison graphs in PDF",
-            value=False,
-            disabled=not comparison_available,
-        )
-
-        selected_comparison_metrics = []
-        selected_comparison_groups = []
-        if comparison_available:
-            metric_options = sorted(comparison_df["METRIC"].dropna().astype(str).unique().tolist())
-            sorted_comparison_df = comparison_df.sort_values(["SEMESTER_ORDER", "ACADEMIC_YEAR"], na_position="last")
-            group_options = sorted_comparison_df["GROUP_LABEL"].dropna().astype(str).drop_duplicates().tolist()
-            if include_comparison_graphs:
-                selected_comparison_metrics = st.multiselect(
-                    "Choose GPA metrics for comparison pages",
-                    metric_options,
-                    default=metric_options[: min(2, len(metric_options))],
-                )
-                selected_comparison_groups = st.multiselect(
-                    "Choose semester/year groups to include",
-                    group_options,
-                    default=group_options,
-                )
-                if selected_comparison_metrics:
-                    preview_metric = st.selectbox("Preview comparison graph", selected_comparison_metrics)
-                    st.pyplot(
-                        plot_semester_metric_bars(comparison_df, preview_metric, selected_comparison_groups),
-                        width="stretch",
-                    )
+        
+        saved_comp_fig = st.session_state.get("comparison_fig")
+        include_comp = False
+        
+        if saved_comp_fig:
+            include_comp = st.checkbox("Include Semester Comparison Graph in PDF", value=True)
         else:
-            st.caption("Comparison graphs require at least two semester/year groups within the selected course.")
+            st.info("💡 To include a comparison graph, visit the 'Semester Comparison' page and generate one first.")
 
-        if st.button("Generate & Download PDF", type="primary"):
-            with st.spinner("⏳ Analyzing data and drawing all graphs... This might take 10-20 seconds."):
-                try:
-                    pdf_bytes = generate_master_pdf(
-                        course_name=course_name_string,
-                        semester=selected_semester,
-                        df=filtered_df,
-                        valid_subjects=valid_subjects,
-                        stats_df=stats_df,
-                        current_class_mask=current_class_mask,
-                        comparison_df=comparison_df if include_comparison_graphs else None,
-                        comparison_metrics=selected_comparison_metrics if include_comparison_graphs else None,
-                        comparison_groups=selected_comparison_groups if include_comparison_graphs else None,
-                    )
-                    st.success("✅ PDF Generated Successfully!")
-                    st.download_button(
-                        label="⬇️ Click here to Download PDF",
-                        data=pdf_bytes,
-                        file_name=f"{course_name_string}_Sem_{selected_semester}_Analysis.pdf",
-                        mime="application/pdf"
-                    )
-                except Exception as e:
-                    st.error(f"Failed to generate PDF: {e}")
+        if st.button("Generate Master Report PDF"):
+            if gpa_curve_fig is None:
+                st.warning("⚠️ Please open Tab 3 at least once to select a GPA metric and Z-Score target before downloading.")
+            else:
+                with st.spinner("Generating graphs for all subjects and building PDF (this might take a few seconds)..."):
+                    import matplotlib.pyplot as plt 
+                    
+                    try:
+                        all_subject_figs = []
+                        grade_to_point = {'O':10,'E':9,'A':8,'B':7,'C':6,'D':5,'F':0}
+                        exclude_old_batch_state = exclude_old_batch 
+                        
+                        for subj in valid_subjects:
+                            full_grades = filtered_df[subj].apply(lambda x: parse_grade_value(x)[0])
+                            full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
+
+                            if not exclude_old_batch_state:
+                                reg_grades = filtered_df[current_class_mask][subj].apply(lambda x: parse_grade_value(x)[0])
+                                reg_subj_num = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
+                            else:
+                                reg_subj_num = None
+
+                            fig = plot_normal_curve(full_subj_num, reg_subj_num, title=f"{subj} Distribution", is_grade_scale=True)
+                            if fig is not None:
+                                all_subject_figs.append(fig)
+
+                        summary = {
+                            "Total Evaluated": len(filtered_df),
+                            "Course": course_name_string,
+                            "Semester": selected_semester,
+                            "Current Batch (Total)": int(total_current),
+                            "Current Batch Pass %": f"{current_pass_pct:.1f}%",
+                            "Old Batch Students": int(old_batch_count)
+                        }
+                        
+                        pdf_bytes = create_master_report_pdf(
+                            college_name=COLLEGE_NAME,
+                            course_name=course_name_string,
+                            semester=selected_semester,
+                            summary_table=summary,
+                            status_fig=status_fig, 
+                            subject_stats_df=stats_df, 
+                            gpa_curve_fig=gpa_curve_fig, 
+                            subject_curve_figs=all_subject_figs, 
+                            z_score_df=z_summary_df, 
+                            comparison_fig=saved_comp_fig if include_comp else None
+                        )
+                        
+                        for fig in all_subject_figs:
+                            plt.close(fig)
+                        
+                        st.download_button(
+                            label="Download Full Report",
+                            data=pdf_bytes,
+                            file_name=f"Result_Analysis_{selected_semester}.pdf",
+                            mime="application/pdf"
+                        )
+                    except Exception as e:
+                        st.error(f"Error generating PDF. Details: {e}")
 
 render_footer()
