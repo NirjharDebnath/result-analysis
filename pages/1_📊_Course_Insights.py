@@ -99,6 +99,13 @@ if data:
     subject_curve_fig = None
     z_summary_df = pd.DataFrame()
 
+    # Pre-compute valid GPA columns: only those with actual numeric data for the selected course/semester
+    _all_gpa_cols = get_gpa_columns(filtered_df)
+    valid_gpa_cols = [
+        col for col in _all_gpa_cols
+        if pd.to_numeric(filtered_df[col], errors='coerce').dropna().shape[0] > 0
+    ]
+
     tab1, tab2, tab3, tab4 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves", "📥 Export PDF"])
 
     with tab1:
@@ -161,9 +168,8 @@ if data:
         grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
 
         with col_gpa:
-            gpa_cols = get_gpa_columns(filtered_df)
-            if gpa_cols:
-                selected_gpa = st.selectbox("Select GPA Metric", gpa_cols)
+            if valid_gpa_cols:
+                selected_gpa = st.selectbox("Select GPA Metric", valid_gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
                 gpa_curve_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
@@ -228,63 +234,71 @@ if data:
             st.info("💡 To include a comparison graph, visit the 'Semester Comparison' page and generate one first.")
 
         if st.button("Generate Master Report PDF"):
-            if gpa_curve_fig is None:
-                st.warning("⚠️ Please open Tab 3 at least once to select a GPA metric and Z-Score target before downloading.")
-            else:
-                with st.spinner("Generating graphs for all subjects and building PDF (this might take a few seconds)..."):
-                    import matplotlib.pyplot as plt 
+            with st.spinner("Generating graphs for all subjects and building PDF (this might take a few seconds)..."):
+                import matplotlib.pyplot as plt 
+                
+                try:
+                    all_subject_figs = []
+                    grade_to_point = {'O':10,'E':9,'A':8,'B':7,'C':6,'D':5,'F':0}
+                    exclude_old_batch_state = exclude_old_batch 
                     
-                    try:
-                        all_subject_figs = []
-                        grade_to_point = {'O':10,'E':9,'A':8,'B':7,'C':6,'D':5,'F':0}
-                        exclude_old_batch_state = exclude_old_batch 
-                        
-                        for subj in valid_subjects:
-                            full_grades = filtered_df[subj].apply(lambda x: parse_grade_value(x)[0])
-                            full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
+                    for subj in valid_subjects:
+                        full_grades = filtered_df[subj].apply(lambda x: parse_grade_value(x)[0])
+                        full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
 
-                            if not exclude_old_batch_state:
-                                reg_grades = filtered_df[current_class_mask][subj].apply(lambda x: parse_grade_value(x)[0])
-                                reg_subj_num = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
-                            else:
-                                reg_subj_num = None
+                        if not exclude_old_batch_state:
+                            reg_grades = filtered_df[current_class_mask][subj].apply(lambda x: parse_grade_value(x)[0])
+                            reg_subj_num = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
+                        else:
+                            reg_subj_num = None
 
-                            fig = plot_normal_curve(full_subj_num, reg_subj_num, title=f"{subj} Distribution", is_grade_scale=True)
-                            if fig is not None:
-                                all_subject_figs.append(fig)
+                        fig = plot_normal_curve(full_subj_num, reg_subj_num, title=f"{subj} Distribution", is_grade_scale=True)
+                        if fig is not None:
+                            all_subject_figs.append(fig)
 
-                        summary = {
-                            "Total Evaluated": len(filtered_df),
-                            "Course": course_name_string,
-                            "Semester": selected_semester,
-                            "Current Batch (Total)": int(total_current),
-                            "Current Batch Pass %": f"{current_pass_pct:.1f}%",
-                            "Old Batch Students": int(old_batch_count)
-                        }
-                        
-                        pdf_bytes = create_master_report_pdf(
-                            college_name=COLLEGE_NAME,
-                            course_name=course_name_string,
-                            semester=selected_semester,
-                            summary_table=summary,
-                            status_fig=status_fig, 
-                            subject_stats_df=stats_df, 
-                            gpa_curve_fig=gpa_curve_fig, 
-                            subject_curve_figs=all_subject_figs, 
-                            z_score_df=z_summary_df, 
-                            comparison_fig=saved_comp_fig if include_comp else None
-                        )
-                        
-                        for fig in all_subject_figs:
-                            plt.close(fig)
-                        
-                        st.download_button(
-                            label="Download Full Report",
-                            data=pdf_bytes,
-                            file_name=f"Result_Analysis_{selected_semester}.pdf",
-                            mime="application/pdf"
-                        )
-                    except Exception as e:
-                        st.error(f"Error generating PDF. Details: {e}")
+                    # Generate bell curves for all valid GPA columns
+                    all_gpa_figs = []
+                    for gpa_col in valid_gpa_cols:
+                        full_gpa_data = pd.to_numeric(filtered_df[gpa_col], errors='coerce')
+                        reg_gpa_data = pd.to_numeric(filtered_df[current_class_mask][gpa_col], errors='coerce') if not exclude_old_batch_state else None
+                        gpa_fig = plot_normal_curve(full_gpa_data, reg_gpa_data, title=f"{gpa_col} Curve", is_grade_scale=False)
+                        if gpa_fig is not None:
+                            all_gpa_figs.append(gpa_fig)
+
+                    summary = {
+                        "Total Evaluated": len(filtered_df),
+                        "Course": course_name_string,
+                        "Semester": selected_semester,
+                        "Current Batch (Total)": int(total_current),
+                        "Current Batch Pass %": f"{current_pass_pct:.1f}%",
+                        "Old Batch Students": int(old_batch_count)
+                    }
+                    
+                    pdf_bytes = create_master_report_pdf(
+                        college_name=COLLEGE_NAME,
+                        course_name=course_name_string,
+                        semester=selected_semester,
+                        summary_table=summary,
+                        status_fig=status_fig, 
+                        subject_stats_df=stats_df, 
+                        gpa_curve_figs=all_gpa_figs, 
+                        subject_curve_figs=all_subject_figs, 
+                        z_score_df=z_summary_df, 
+                        comparison_fig=saved_comp_fig if include_comp else None
+                    )
+                    
+                    for fig in all_subject_figs:
+                        plt.close(fig)
+                    for fig in all_gpa_figs:
+                        plt.close(fig)
+                    
+                    st.download_button(
+                        label="Download Full Report",
+                        data=pdf_bytes,
+                        file_name=f"Result_Analysis_{selected_semester}.pdf",
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"Error generating PDF. Details: {e}")
 
 render_footer()
