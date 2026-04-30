@@ -17,7 +17,7 @@ def create_master_report_pdf(
     summary_table, 
     status_fig, 
     subject_stats_df,
-    gpa_curve_fig,
+    gpa_curve_figs,
     subject_curve_figs,
     z_score_df,
     comparison_fig=None
@@ -83,16 +83,23 @@ def create_master_report_pdf(
         pdf.cell(12, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
         pdf.ln()
 
-    # --- Page 3: GPA Distribution Curve ---
-    if gpa_curve_fig:
+    # --- Page 3: GPA Distribution Curves ---
+    if gpa_curve_figs:
         pdf.add_page()
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, "GPA Distribution Curve", ln=True)
+        pdf.cell(190, 10, "GPA Distribution Curves", ln=True)
         pdf.ln(5)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            gpa_curve_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-            pdf.image(tmp.name, x=10, w=180)
-            tmp_files_to_clean.append(tmp.name)
+
+        y_offset = pdf.get_y()
+        for i, fig in enumerate(gpa_curve_figs):
+            if i > 0 and i % 2 == 0:
+                pdf.add_page()
+                y_offset = 20
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp.name, x=10, y=y_offset, w=180)
+                tmp_files_to_clean.append(tmp.name)
+            y_offset += 120
 
     # --- Pages 4+: All Subject Curves (Stacked 2 per page) ---
     if subject_curve_figs:
