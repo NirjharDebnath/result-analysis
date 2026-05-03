@@ -90,7 +90,7 @@ def create_master_report_pdf(
     for key, val in summary_table.items():
         pdf.cell(90, 7, clean_text(f"{key}"), border=1)
         pdf.cell(50, 7, clean_text(f"{val}"), border=1, align="C")
-        pdf.cell(50, 7, "-", border=1, align="C")
+        pdf.cell(50, 7, "N/A", border=1, align="C")
         pdf.ln()
 
     pdf.ln(5)
