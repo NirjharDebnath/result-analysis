@@ -22,7 +22,7 @@ def create_master_report_pdf(
     z_score_df,
     comparison_fig=None,
     overview_fig=None,
-    batch_overview_data=None,
+    overview_summary_data=None,
     logo_path=None,
 ):
     pdf = FPDF()
@@ -62,36 +62,28 @@ def create_master_report_pdf(
             tmp_files_to_clean.append(tmp.name)
         pdf.ln(4)
 
-    # --- Page 2: Combined Batch Overview + Executive Summary table, then Subject Statistics ---
+    # --- Page 2: Batch Overview Summary table, then Subject Statistics ---
     pdf.add_page()
 
-    # Combined table: batch overview data + executive summary in one place
+    # Batch overview summary derived from the overview graph
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 9, clean_text("Batch Overview & Executive Summary"), ln=True)
+    pdf.cell(190, 9, clean_text("Batch Overview Summary"), ln=True)
     pdf.ln(2)
 
     # Header row
     pdf.set_font("Arial", "B", 9)
-    pdf.cell(90, 7, "Category / Metric", border=1, align="C")
-    pdf.cell(50, 7, "Count / Value", border=1, align="C")
-    pdf.cell(50, 7, "% of Class", border=1, align="C")
+    pdf.cell(100, 7, "Metric", border=1, align="C")
+    pdf.cell(45, 7, "Count", border=1, align="C")
+    pdf.cell(45, 7, "% of Total", border=1, align="C")
     pdf.ln()
     pdf.set_font("Arial", "", 9)
 
-    # Batch overview rows
-    if batch_overview_data:
-        for row in batch_overview_data:
-            pdf.cell(90, 7, clean_text(str(row.get("Status Category", ""))), border=1)
-            pdf.cell(50, 7, clean_text(str(row.get("Count", ""))), border=1, align="C")
-            pdf.cell(50, 7, clean_text(str(row.get("% of Class", ""))), border=1, align="C")
+    if overview_summary_data:
+        for row in overview_summary_data:
+            pdf.cell(100, 7, clean_text(str(row.get("Metric", ""))), border=1)
+            pdf.cell(45, 7, clean_text(str(row.get("Count", ""))), border=1, align="C")
+            pdf.cell(45, 7, clean_text(str(row.get("% of Total", ""))), border=1, align="C")
             pdf.ln()
-
-    # Executive summary rows (no % column applicable)
-    for key, val in summary_table.items():
-        pdf.cell(90, 7, clean_text(f"{key}"), border=1)
-        pdf.cell(50, 7, clean_text(f"{val}"), border=1, align="C")
-        pdf.cell(50, 7, "N/A", border=1, align="C")
-        pdf.ln()
 
     pdf.ln(5)
 

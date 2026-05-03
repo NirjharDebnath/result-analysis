@@ -284,19 +284,40 @@ if data:
                         "Old Batch Students": int(old_batch_count)
                     }
 
-                    # Build detailed batch overview table rows for the PDF
-                    batch_overview_data = []
-                    _status_display = {
-                        "Current Batch": "Current Batch (All Clear)",
-                        "Backlog (Current Batch)": "Current Batch (Backlogs)",
-                    }
-                    for s, c in filtered_df["STATUS"].value_counts().items():
-                        display_name = _status_display.get(s, s)
-                        batch_overview_data.append({
-                            "Status Category": display_name,
-                            "Count": int(c),
-                            "% of Class": f"{(c / len(filtered_df) * 100):.1f}%",
-                        })
+                    # Build overview summary table rows for the PDF (mirrors the overview graph)
+                    _total = len(filtered_df)
+                    _n_current = int(current_class_mask.sum())
+                    _n_reappearing = _total - _n_current
+                    _current_passed = int((filtered_df["STATUS"] == "Current Batch").sum())
+                    _current_failed = _n_current - _current_passed
+                    _reapp_df = filtered_df[~current_class_mask]
+                    if _n_reappearing > 0 and "SEMESTER RESULT" in _reapp_df.columns:
+                        _reapp_passed = int(_reapp_df["SEMESTER RESULT"].str.upper().str.contains("PASS", na=False).sum())
+                    else:
+                        _reapp_passed = 0
+                    _reapp_failed = _n_reappearing - _reapp_passed
+                    _lateral_in_current = current_class_mask & lateral_mask
+                    _n_lateral = int(_lateral_in_current.sum())
+                    _n_regular = _n_current - _n_lateral
+                    _total_passed = _current_passed + _reapp_passed
+                    _total_failed = _total - _total_passed
+
+                    def _pct(n, d):
+                        return f"{n / d * 100:.1f}%" if d > 0 else "N/A"
+
+                    overview_summary_data = [
+                        {"Metric": "Total Students",                        "Count": _total,           "% of Total": "100.0%"},
+                        {"Metric": "Current Year Students",                  "Count": _n_current,       "% of Total": _pct(_n_current, _total)},
+                        {"Metric": "Reappearing (Old Batch) Students",       "Count": _n_reappearing,   "% of Total": _pct(_n_reappearing, _total)},
+                        {"Metric": "Current Year - Passed (All Clear)",      "Count": _current_passed,  "% of Total": _pct(_current_passed, _total)},
+                        {"Metric": "Current Year - Failed / Backlog",        "Count": _current_failed,  "% of Total": _pct(_current_failed, _total)},
+                        {"Metric": "Reappearing - Cleared Backlogs",         "Count": _reapp_passed,    "% of Total": _pct(_reapp_passed, _total)},
+                        {"Metric": "Reappearing - Still Backlog",            "Count": _reapp_failed,    "% of Total": _pct(_reapp_failed, _total)},
+                        {"Metric": "Regular Students (Current Batch)",       "Count": _n_regular,       "% of Total": _pct(_n_regular, _total)},
+                        {"Metric": "Lateral Entry Students (Current Batch)", "Count": _n_lateral,       "% of Total": _pct(_n_lateral, _total)},
+                        {"Metric": "Overall Passed (All Students)",          "Count": _total_passed,    "% of Total": _pct(_total_passed, _total)},
+                        {"Metric": "Overall Failed (All Students)",          "Count": _total_failed,    "% of Total": _pct(_total_failed, _total)},
+                    ]
 
                     # Resolve logo path
                     logo_path = None
