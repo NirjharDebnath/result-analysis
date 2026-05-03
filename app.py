@@ -12,18 +12,28 @@ render_sidebar_branding()
 
 st.header(COLLEGE_NAME)
 st.title("📁 Upload Your Result Dataset")
+st.markdown(
+    "Welcome! This tool helps you analyse student exam results — pass rates, subject statistics, "
+    "grade distributions, rankings, and inter-semester comparisons. **Start by uploading your result file below.**"
+)
 
-st.info("Start here: upload your result file, validate it, and then use the sidebar to navigate to Insights or Rankings.")
+st.info(
+    "📌 **Steps to get started:**\n"
+    "1. Download the sample CSV template to see the required column format.\n"
+    "2. Upload your result file(s) in CSV or Excel format.\n"
+    "3. Set the exam month and year for each file.\n"
+    "4. Once validated, use the **sidebar** to navigate to Course Insights, Rankings, Student Profiles, or Semester Comparison."
+)
 
 st.download_button(
-    "Download sample CSV template",
+    "⬇️ Download sample CSV template",
     data=get_sample_template_csv(),
     file_name="result_analysis_sample_template.csv",
     mime="text/csv",
 )
 
 uploaded_files = st.file_uploader(
-    "Upload result file(s)",
+    "Upload result file(s)  (CSV, XLS, or XLSX)",
     type=["csv", "xls", "xlsx"],
     accept_multiple_files=True
 )
@@ -39,8 +49,8 @@ if uploaded_files:
         current_month_index = now_utc.month - 1
 
         exam_session_by_file = {}
-        with st.expander("🗓️ Exam Month/Year per Uploaded File", expanded=True):
-            st.caption("Enter the exam month and year for each uploaded file. These values are added as columns for better current/past/reappearing separation.")
+        with st.expander("🗓️ Set Exam Month & Year for Each File", expanded=True):
+            st.caption("These values are used to separate current-batch students from re-appearing (old batch) students. Make sure they are correct before proceeding.")
             for idx, uploaded_file in enumerate(uploaded_files):
                 c1, c2, c3 = st.columns([3, 2, 2])
                 with c1:
@@ -72,11 +82,11 @@ if uploaded_files:
         errors, metadata_cols, subject_cols = validate_dataset(df)
 
         if errors:
-            st.error("Validation failed")
+            st.error("Validation failed — please check your file format.")
             for err in errors:
                 st.write(f"- {err}")
         else:
-            st.success("Dataset validated successfully.")
+            st.success("✅ Dataset validated successfully.")
             st.caption(f"Processed {len(uploaded_files)} file(s).")
             dedup_removed = int(df.attrs.get("dropped_duplicate_rows", 0))
             if dedup_removed > 0:
@@ -86,26 +96,28 @@ if uploaded_files:
             unique_semesters = sorted(semester_groups_df["SEMESTER_LABEL"].dropna().astype(str).unique().tolist())
             unique_groups = sorted(semester_groups_df["GROUP_LABEL"].dropna().astype(str).unique().tolist())
             if len(unique_semesters) > 1:
-                st.info(f"Detected multiple semesters ({len(unique_semesters)}). Use the sidebar 'Semester Comparison' page for inter-sem analysis.")
+                st.info(f"📊 Detected **{len(unique_semesters)} semesters** in this dataset. Head to the **Semester Comparison** page in the sidebar to compare them side by side.")
             elif len(unique_groups) > 1:
-                st.info(f"Detected multiple academic-year groups within the same semester ({len(unique_groups)}). Use 'Semester Comparison' for year-wise analysis.")
+                st.info(f"📊 Detected **{len(unique_groups)} academic-year groups** within the same semester. Use **Semester Comparison** for year-wise analysis.")
             else:
-                st.warning("Only one semester/year group detected. Comparison features will be limited until more semester/year data is uploaded.")
-            st.caption("Next step: choose a page from the left sidebar to explore insights, rankings, or student-level performance.")
+                st.warning("Only one semester/year group detected. Comparison features will be limited until more semester data is uploaded.")
+            st.caption("✅ Next: choose a page from the left sidebar — **Course Insights**, **Rankings**, **Student Profile**, or **Semester Comparison**.")
             
             # Save to session state so other pages can access it
             st.session_state["validated_df"] = df
             st.session_state["subject_cols"] = subject_cols
 
-            with st.expander("Preview dataset", expanded=True):
+            with st.expander("🔍 Preview Dataset (first 50 rows)", expanded=True):
                 st.dataframe(df.head(50), use_container_width=True)
 
             col1, col2 = st.columns(2)
             with col1:
-                st.subheader("Metadata columns")
+                st.subheader("Metadata Columns")
+                st.caption("These columns describe the student and exam context.")
                 st.write(metadata_cols)
             with col2:
-                st.subheader("Subject columns")
+                st.subheader("Subject Columns")
+                st.caption("These columns contain subject-wise grades or marks.")
                 st.write(subject_cols)
                 
     except Exception as exc:

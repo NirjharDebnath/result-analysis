@@ -43,6 +43,9 @@ def render_sidebar_branding():
     if logo_path:
         st.sidebar.image(logo_path, width=120)
     st.sidebar.markdown("**Kalyani Government Engineering College**")
+    st.sidebar.markdown("---")
+    st.sidebar.caption("🎓 Result Analysis Tool")
+    st.sidebar.caption("Designed by **Nirjhar Debnath**, Dept of CSE, KGEC")
 
 def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, rotate_x: int = 0):
     ax.set_facecolor(SOFT_COLORS["bg"])
@@ -59,5 +62,4 @@ def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, r
 
 def render_footer():
     st.markdown("---")
-    st.caption("© Designed by Nirjhar Debnath, Dept of CSE, Kalyani Government Engineering College.")
     
