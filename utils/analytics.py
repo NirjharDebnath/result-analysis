@@ -252,6 +252,65 @@ def build_file_comparison_data(df: pd.DataFrame, gpa_columns: List[str]) -> pd.D
     return result.sort_values(["SEMESTER_ORDER", "GROUP_LABEL", "METRIC"]).reset_index(drop=True)
 
 
+def get_lateral_mask(df: pd.DataFrame, roll_col: str = "ROLL NO") -> pd.Series:
+    """
+    Returns a boolean mask identifying lateral-entry students within the current class.
+
+    Lateral students share the same course code as regular students but have an
+    admission year one year later (they joined directly in the 3rd semester).
+    """
+    lateral_mask = pd.Series(False, index=df.index, dtype=bool)
+
+    if roll_col not in df.columns:
+        return lateral_mask
+
+    rolls = df[roll_col].astype(str).str.strip()
+    valid_rolls = rolls[rolls.str.len() >= ROLL_YEAR_END_INDEX]
+
+    if valid_rolls.empty:
+        return lateral_mask
+
+    parsed = pd.DataFrame(index=valid_rolls.index)
+    parsed["ROLL_COURSE"] = valid_rolls.str[3:6]
+    parsed["ENTRY_YEAR"] = valid_rolls.apply(infer_academic_year_from_roll)
+    parsed = parsed.dropna(subset=["ENTRY_YEAR"])
+
+    if parsed.empty:
+        return lateral_mask
+
+    parsed["ENTRY_YEAR"] = parsed["ENTRY_YEAR"].astype(int)
+
+    roll_course_mode = parsed["ROLL_COURSE"].mode()
+    target_course = str(roll_course_mode.iloc[0]) if not roll_course_mode.empty else ""
+
+    if "COURSE CODE" in df.columns:
+        course_code_series = (
+            df["COURSE CODE"].astype(str).str.strip()
+            .replace({"": pd.NA}).dropna().str.upper()
+            .replace({"NAN": pd.NA, "NONE": pd.NA, "NULL": pd.NA}).dropna()
+        )
+        if not course_code_series.empty:
+            course_mode = course_code_series.mode()
+            if not course_mode.empty:
+                target_course = str(course_mode.iloc[0])
+
+    if not target_course:
+        return lateral_mask
+
+    parsed = parsed[parsed["ROLL_COURSE"] == target_course]
+    if parsed.empty:
+        return lateral_mask
+
+    year_counts = parsed["ENTRY_YEAR"].value_counts()
+    top_count = year_counts.max()
+    tied_top_years = year_counts[year_counts == top_count].index
+    regular_year = int(tied_top_years.max())
+
+    is_lateral_idx = parsed[parsed["ENTRY_YEAR"] == regular_year + 1].index
+    lateral_mask.loc[is_lateral_idx] = True
+    return lateral_mask
+
+
 def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     """
     Identifies the Current Class (Regulars + Laterals) vs Old Batches.
