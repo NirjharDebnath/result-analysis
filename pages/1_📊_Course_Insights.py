@@ -286,10 +286,12 @@ if data:
 
                     # Build detailed batch overview table rows for the PDF
                     batch_overview_data = []
+                    _status_display = {
+                        "Current Batch": "Current Batch (All Clear)",
+                        "Backlog (Current Batch)": "Current Batch (Backlogs)",
+                    }
                     for s, c in filtered_df["STATUS"].value_counts().items():
-                        display_name = s
-                        if s == "Current Batch": display_name = "Current Batch (All Clear)"
-                        if s == "Backlog (Current Batch)": display_name = "Current Batch (Backlogs)"
+                        display_name = _status_display.get(s, s)
                         batch_overview_data.append({
                             "Status Category": display_name,
                             "Count": int(c),
