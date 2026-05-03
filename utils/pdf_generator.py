@@ -28,37 +28,28 @@ def create_master_report_pdf(
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     tmp_files_to_clean = []
-    
-    # --- Page 1: Header with Logo & Batch Overview ---
+
+    # --- Page 1: Header + Batch Overview Graph ---
     pdf.add_page()
 
-    # Logo + college name side by side at the top
-    logo_w = 22  # mm — small logo
-    if logo_path and os.path.exists(logo_path):
-        pdf.image(logo_path, x=10, y=10, w=logo_w)
-        text_x = 10 + logo_w + 8
-        text_w = 190 - logo_w - 8
-        pdf.set_xy(text_x, 10)
-    else:
-        text_x = 10
-        text_w = 190
-        pdf.set_xy(text_x, 10)
-
+    # College name centered at the top
     pdf.set_font("Arial", "B", 15)
-    pdf.cell(text_w, 8, clean_text(college_name), ln=True, align="C")
-    pdf.set_x(text_x)
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(text_w, 7, clean_text(f"Combined Result Analysis Report - {course_name}"), ln=True, align="C")
-    pdf.set_x(text_x)
-    pdf.set_font("Arial", "", 9)
-    pdf.cell(text_w, 6, clean_text(f"Semester: {semester}"), ln=True, align="C")
+    pdf.cell(190, 8, clean_text(college_name), ln=True, align="C")
 
-    # Ensure we're below the logo before adding content
+    # Logo centered below college name
     if logo_path and os.path.exists(logo_path):
-        pdf.set_y(max(pdf.get_y(), 10 + logo_w + 2))
+        logo_w = 22  # mm
+        pdf.image(logo_path, x=(210 - logo_w) / 2, y=pdf.get_y(), w=logo_w)
+        pdf.ln(logo_w + 2)
+
+    # Course and semester lines
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(190, 7, clean_text(f"Combined Result Analysis Report - {course_name}"), ln=True, align="C")
+    pdf.set_font("Arial", "", 9)
+    pdf.cell(190, 6, clean_text(f"Semester: {semester}"), ln=True, align="C")
     pdf.ln(4)
 
-    # Overview graph (was "second graph", now on page 1)
+    # Overview graph
     if overview_fig is not None:
         pdf.set_font("Arial", "B", 11)
         pdf.cell(190, 8, "Batch Overview", ln=True)
@@ -71,33 +62,40 @@ def create_master_report_pdf(
             tmp_files_to_clean.append(tmp.name)
         pdf.ln(4)
 
-    # Detailed batch overview table
+    # --- Page 2: Combined Batch Overview + Executive Summary table, then Subject Statistics ---
+    pdf.add_page()
+
+    # Combined table: batch overview data + executive summary in one place
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 9, clean_text("Batch Overview & Executive Summary"), ln=True)
+    pdf.ln(2)
+
+    # Header row
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(90, 7, "Category / Metric", border=1, align="C")
+    pdf.cell(50, 7, "Count / Value", border=1, align="C")
+    pdf.cell(50, 7, "% of Class", border=1, align="C")
+    pdf.ln()
+    pdf.set_font("Arial", "", 9)
+
+    # Batch overview rows
     if batch_overview_data:
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(190, 8, clean_text("Batch Overview \u2014 Detailed Breakdown"), ln=True)
-        pdf.ln(1)
-        pdf.set_font("Arial", "B", 9)
-        pdf.cell(90, 7, "Status Category", border=1, align="C")
-        pdf.cell(50, 7, "Count", border=1, align="C")
-        pdf.cell(50, 7, "% of Class", border=1, align="C")
-        pdf.ln()
-        pdf.set_font("Arial", "", 9)
         for row in batch_overview_data:
             pdf.cell(90, 7, clean_text(str(row.get("Status Category", ""))), border=1)
             pdf.cell(50, 7, clean_text(str(row.get("Count", ""))), border=1, align="C")
             pdf.cell(50, 7, clean_text(str(row.get("% of Class", ""))), border=1, align="C")
             pdf.ln()
-        pdf.ln(3)
 
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(190, 8, "Executive Summary", ln=True)
-    pdf.set_font("Arial", "", 9)
+    # Executive summary rows (no % column applicable)
     for key, val in summary_table.items():
-        pdf.cell(95, 7, clean_text(f"{key}:"), border=1)
-        pdf.cell(95, 7, clean_text(f"{val}"), border=1, ln=True)
+        pdf.cell(90, 7, clean_text(f"{key}"), border=1)
+        pdf.cell(50, 7, clean_text(f"{val}"), border=1, align="C")
+        pdf.cell(50, 7, "-", border=1, align="C")
+        pdf.ln()
 
-    # --- Page 3: FULL Subject Statistics Matrix ---
-    pdf.add_page()
+    pdf.ln(5)
+
+    # Subject Statistics Matrix on the same page (continued)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 10, "Subject Performance Statistics", ln=True)
     pdf.ln(5)
