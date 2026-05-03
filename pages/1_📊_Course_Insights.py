@@ -1,7 +1,8 @@
 # pages/1_📊_Course_Insights.py
+import os
 import pandas as pd
 import streamlit as st
-from utils.constants import COLLEGE_NAME
+from utils.constants import COLLEGE_NAME, LOGO_CANDIDATE_PATHS
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer
 from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask
@@ -282,6 +283,25 @@ if data:
                         "Current Batch Pass %": f"{current_pass_pct:.1f}%",
                         "Old Batch Students": int(old_batch_count)
                     }
+
+                    # Build detailed batch overview table rows for the PDF
+                    batch_overview_data = []
+                    for s, c in filtered_df["STATUS"].value_counts().items():
+                        display_name = s
+                        if s == "Current Batch": display_name = "Current Batch (All Clear)"
+                        if s == "Backlog (Current Batch)": display_name = "Current Batch (Backlogs)"
+                        batch_overview_data.append({
+                            "Status Category": display_name,
+                            "Count": int(c),
+                            "% of Class": f"{(c / len(filtered_df) * 100):.1f}%",
+                        })
+
+                    # Resolve logo path
+                    logo_path = None
+                    for candidate in LOGO_CANDIDATE_PATHS:
+                        if os.path.exists(candidate):
+                            logo_path = candidate
+                            break
                     
                     pdf_bytes = create_master_report_pdf(
                         college_name=COLLEGE_NAME,
@@ -295,6 +315,8 @@ if data:
                         z_score_df=z_summary_df, 
                         comparison_fig=saved_comp_fig if include_comp else None,
                         overview_fig=overview_fig,
+                        batch_overview_data=batch_overview_data,
+                        logo_path=logo_path,
                     )
                     
                     for fig in all_subject_figs:
