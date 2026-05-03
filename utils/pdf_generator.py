@@ -36,8 +36,8 @@ def create_master_report_pdf(
     logo_w = 22  # mm — small logo
     if logo_path and os.path.exists(logo_path):
         pdf.image(logo_path, x=10, y=10, w=logo_w)
-        text_x = 10 + logo_w + 4
-        text_w = 190 - logo_w - 4
+        text_x = 10 + logo_w + 8
+        text_w = 190 - logo_w - 8
         pdf.set_xy(text_x, 10)
     else:
         text_x = 10
