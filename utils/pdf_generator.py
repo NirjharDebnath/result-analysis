@@ -7,7 +7,7 @@ import pandas as pd
 def clean_text(text):
     """Sanitizes text to prevent FPDF Unicode crashes."""
     if pd.isna(text): return ""
-    text_str = str(text).replace("\u03c3", "SD") 
+    text_str = str(text).replace("\u03c3", "SD").replace("\u2014", " - ").replace("\u2013", " - ")
     return text_str.encode('latin-1', 'ignore').decode('latin-1')
 
 def create_master_report_pdf(
@@ -74,7 +74,7 @@ def create_master_report_pdf(
     # Detailed batch overview table
     if batch_overview_data:
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(190, 8, "Batch Overview — Detailed Breakdown", ln=True)
+        pdf.cell(190, 8, clean_text("Batch Overview \u2014 Detailed Breakdown"), ln=True)
         pdf.ln(1)
         pdf.set_font("Arial", "B", 9)
         pdf.cell(90, 7, "Status Category", border=1, align="C")
