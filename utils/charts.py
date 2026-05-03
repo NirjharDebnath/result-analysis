@@ -4,6 +4,7 @@ import seaborn as sns
 import numpy as np
 from scipy.stats import norm
 import pandas as pd
+from matplotlib.gridspec import GridSpec
 from typing import Optional, List
 from utils.constants import SOFT_COLORS
 
@@ -80,6 +81,176 @@ def plot_status_bars(status_counts: pd.Series, total_students: int = None):
     
     plt.tight_layout()
     return fig
+
+def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Series, lateral_mask: pd.Series):
+    """
+    Creates a 5-subplot executive overview figure for Tab 1.
+
+    Subplots:
+    1. Current Year Students vs Backlog (Reappearing) — composition
+    2. Current Year Students: Passed vs Failed
+    3. Old Batch (Reappearing): Passed vs Failed (or "No reappearing" notice)
+    4. Lateral vs Regular Students among the current class
+    5. Overall: Passed vs Failed (all students)
+    """
+    total = len(filtered_df)
+
+    if total == 0:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+        fig.patch.set_facecolor(THEME["bg"])
+        ax.text(0.5, 0.5, "No data available", ha="center", va="center", transform=ax.transAxes)
+        ax.axis("off")
+        return fig
+
+    current_df = filtered_df[current_class_mask]
+    reappearing_df = filtered_df[~current_class_mask]
+
+    n_current = len(current_df)
+    n_reappearing = len(reappearing_df)
+
+    # 2. Current Year pass vs fail
+    current_passed = int((current_df["STATUS"] == "Current Batch").sum())
+    current_failed = n_current - current_passed
+
+    # 3. Old-batch / reappearing pass vs fail
+    if n_reappearing > 0 and "SEMESTER RESULT" in reappearing_df.columns:
+        reapp_passed = int(
+            reappearing_df["SEMESTER RESULT"].str.upper().str.contains("PASS", na=False).sum()
+        )
+    else:
+        reapp_passed = 0
+    reapp_failed = n_reappearing - reapp_passed
+
+    # 4. Lateral vs Regular (within current class only)
+    lateral_in_current = current_class_mask & lateral_mask
+    n_lateral = int(lateral_in_current.sum())
+    n_regular = n_current - n_lateral
+
+    # 5. Overall pass vs fail
+    total_passed = current_passed + reapp_passed
+    total_failed = total - total_passed
+
+    # Colour palette
+    PASS_COLOR    = "#27AE60"
+    FAIL_COLOR    = "#C0392B"
+    CURRENT_COLOR = "#2980B9"
+    REAPP_COLOR   = "#E67E22"
+    LATERAL_COLOR = "#8E44AD"
+    REGULAR_COLOR = "#2E4053"
+
+    fig = plt.figure(figsize=(16, 10))
+    fig.patch.set_facecolor(THEME["bg"])
+    gs = GridSpec(2, 6, figure=fig, hspace=0.55, wspace=0.5)
+
+    ax1 = fig.add_subplot(gs[0, 0:2])
+    ax2 = fig.add_subplot(gs[0, 2:4])
+    ax3 = fig.add_subplot(gs[0, 4:6])
+    ax4 = fig.add_subplot(gs[1, 0:4])
+    ax5 = fig.add_subplot(gs[1, 4:6])
+
+    for ax in (ax1, ax2, ax3, ax4, ax5):
+        ax.set_facecolor(THEME["bg"])
+
+    # ── Helper: donut pie chart ──────────────────────────────────────────────
+    def _donut(ax, values, labels, colors, title):
+        nonzero = [v for v in values if v > 0]
+        if not nonzero:
+            ax.text(0.5, 0.5, "No Data", ha="center", va="center", transform=ax.transAxes, fontsize=11)
+            ax.set_title(title, fontweight="bold", fontsize=10)
+            ax.axis("off")
+            return
+        wedges, _, autotexts = ax.pie(
+            values,
+            labels=None,
+            colors=colors,
+            autopct=lambda p: f"{p:.1f}%" if p > 0 else "",
+            startangle=90,
+            wedgeprops=dict(width=0.5),
+            pctdistance=0.75,
+        )
+        for at in autotexts:
+            at.set_fontsize(9)
+            at.set_fontweight("bold")
+        ax.legend(
+            wedges,
+            [f"{l}  ({v})" for l, v in zip(labels, values)],
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.22),
+            ncol=1,
+            fontsize=8,
+            frameon=False,
+        )
+        ax.set_title(title, fontweight="bold", fontsize=10)
+
+    # ── Subplot 1: Current Year vs Reappearing ───────────────────────────────
+    _donut(
+        ax1,
+        [n_current, n_reappearing],
+        ["Current Year", "Reappearing (Old Batch)"],
+        [CURRENT_COLOR, REAPP_COLOR],
+        "Current Year vs\nReappearing Students",
+    )
+
+    # ── Subplot 2: Current Year Pass / Fail ──────────────────────────────────
+    _donut(
+        ax2,
+        [current_passed, current_failed],
+        ["Passed (All Clear)", "Failed / Backlog"],
+        [PASS_COLOR, FAIL_COLOR],
+        "Current Year Students\nPass vs Fail",
+    )
+
+    # ── Subplot 3: Old Batch Pass / Fail ─────────────────────────────────────
+    _donut(
+        ax3,
+        [reapp_passed, reapp_failed],
+        ["Cleared Backlogs", "Still Backlog"],
+        [PASS_COLOR, FAIL_COLOR],
+        "Reappearing Students\nPass vs Fail",
+    )
+
+    # ── Subplot 4: Lateral vs Regular (horizontal bar) ───────────────────────
+    categories = ["Regular Students", "Lateral Entry"]
+    counts = [n_regular, n_lateral]
+    bar_colors = [REGULAR_COLOR, LATERAL_COLOR]
+
+    bars = ax4.barh(categories, counts, color=bar_colors, edgecolor="black", alpha=0.85, height=0.4)
+    for bar, count in zip(bars, counts):
+        pct = (count / n_current * 100) if n_current > 0 else 0
+        ax4.annotate(
+            f"{count} ({pct:.1f}% of current batch)",
+            xy=(bar.get_width(), bar.get_y() + bar.get_height() / 2),
+            xytext=(5, 0),
+            textcoords="offset points",
+            va="center",
+            ha="left",
+            fontweight="bold",
+            fontsize=10,
+        )
+    ax4.set_title(
+        "Lateral Entry vs Regular Students\n(Current Batch Only — Reappearing excluded)",
+        fontweight="bold",
+        fontsize=10,
+    )
+    ax4.set_xlabel("Number of Students")
+    ax4.set_xlim(0, (max(counts) * 1.55) if max(counts) > 0 else 10)
+    ax4.spines["top"].set_visible(False)
+    ax4.spines["right"].set_visible(False)
+    ax4.grid(axis="x", linestyle="--", alpha=0.4)
+
+    # ── Subplot 5: Overall Pass / Fail ───────────────────────────────────────
+    _donut(
+        ax5,
+        [total_passed, total_failed],
+        ["Passed", "Failed"],
+        [PASS_COLOR, FAIL_COLOR],
+        "Overall Pass vs Fail\n(All Students)",
+    )
+
+    fig.suptitle("Executive Batch Overview — Comprehensive Analysis", fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    return fig
+
 
 def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribution"):
     fig, ax = plt.subplots(figsize=(5, 2.5))

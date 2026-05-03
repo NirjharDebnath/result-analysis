@@ -4,8 +4,8 @@ import streamlit as st
 from utils.constants import COLLEGE_NAME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer
-from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores
-from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution
+from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask
+from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution, plot_executive_overview
 from utils.pdf_generator import create_master_report_pdf
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
@@ -81,6 +81,8 @@ if data:
 
     # --- PRE-GENERATE FIGURES FOR UI & PDF ---
     status_fig = plot_status_bars(filtered_df["STATUS"].value_counts(), total_students)
+    lateral_mask = get_lateral_mask(filtered_df)
+    overview_fig = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
     stats_df = calculate_subject_stats(filtered_df, valid_subjects)
 
     # 🧮 DYNAMICALLY INJECT PASS PERCENTAGE INTO THE TABLE
@@ -119,11 +121,12 @@ if data:
         
         st.divider()
 
+        st.pyplot(overview_fig, use_container_width=True)
+
+        st.divider()
+
         col1, col2 = st.columns([1.5, 1])
         with col1:
-            st.pyplot(status_fig, use_container_width=True)
-
-        with col2:
             st.write("**Detailed Status Breakdown**")
             summary_data = []
             for s, c in filtered_df["STATUS"].value_counts().items():
@@ -138,6 +141,7 @@ if data:
                 })
             st.dataframe(pd.DataFrame(summary_data), hide_index=True, use_container_width=True)
             
+        with col2:
             st.write("") 
             if current_pass_pct >= 90:
                 st.success(f"🌟 **Excellent Performance:** The current batch has a highly successful pass rate of {current_pass_pct:.1f}%.")
