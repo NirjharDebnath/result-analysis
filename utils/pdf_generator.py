@@ -20,7 +20,8 @@ def create_master_report_pdf(
     gpa_curve_figs,
     subject_curve_figs,
     z_score_df,
-    comparison_fig=None
+    comparison_fig=None,
+    overview_fig=None,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -50,7 +51,20 @@ def create_master_report_pdf(
         pdf.cell(95, 7, clean_text(f"{key}:"), border=1)
         pdf.cell(95, 7, clean_text(f"{val}"), border=1, ln=True)
 
-    # --- Page 2: FULL Subject Statistics Matrix ---
+    # --- Page 2: Executive Overview (Tab 1 graph) ---
+    if overview_fig is not None:
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, "Executive Batch Overview", ln=True)
+        pdf.set_font("Arial", "", 9)
+        pdf.multi_cell(190, 6, "This page shows the complete breakdown of the current batch: pass/fail composition, lateral vs regular students, and reappearing student outcomes.")
+        pdf.ln(3)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            overview_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+            pdf.image(tmp.name, x=5, y=None, w=200)
+            tmp_files_to_clean.append(tmp.name)
+
+    # --- Page 3: FULL Subject Statistics Matrix ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 10, "Subject Performance Statistics", ln=True)
@@ -83,7 +97,7 @@ def create_master_report_pdf(
         pdf.cell(12, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
         pdf.ln()
 
-    # --- Page 3: GPA Distribution Curves ---
+    # --- Pages 4+: GPA Distribution Curves ---
     if gpa_curve_figs:
         pdf.add_page()
         pdf.set_font("Arial", "B", 12)

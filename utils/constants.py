@@ -32,14 +32,14 @@ KNOWN_NON_SUBJECT_COLUMNS = {
 
 PASSING_GRADES = {"O", "E", "A", "B", "C", "D"}
 
-# Colors kept as is for now, will update later
+# Summer/Ocean color palette — fresh, high-contrast, accessible
 SOFT_COLORS = {
-    "pass": "#9ECF9B",
-    "fail": "#E7A7A7",
-    "primary": "#A7C7E7",
-    "grid": "#E6DCCF",
-    "accent": "#E5B97A",
-    "bg": "#FFF9F2",
+    "pass": "#A5D6A7",    # soft summer green
+    "fail": "#EF9A9A",    # soft warm red
+    "primary": "#81D4FA", # sky blue
+    "grid": "#B0C4DE",    # steel blue grid
+    "accent": "#FFCC80",  # golden sand
+    "bg": "#F0F7FF",      # light summer sky
 }
 
 LOGO_CANDIDATE_PATHS = [

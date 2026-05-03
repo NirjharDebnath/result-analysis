@@ -13,20 +13,20 @@ st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide"
 st.markdown("""
     <style>
     .stButton>button, .stDownloadButton>button {
-        background-color: #D35400 !important; color: white !important; 
+        background-color: #1565C0 !important; color: white !important; 
         border-radius: 8px !important; border: none !important; 
         padding: 10px 24px !important; font-weight: 600 !important; transition: 0.3s ease-in-out !important;
     }
     .stButton>button:hover, .stDownloadButton>button:hover {
-        background-color: #E67E22 !important; transform: translateY(-2px) !important;
-        box-shadow: 0 4px 10px rgba(211, 84, 0, 0.3) !important;
+        background-color: #1976D2 !important; transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(21, 101, 192, 0.3) !important;
     }
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
-        background-color: #FDF5E6; border-radius: 6px 6px 0 0; padding: 10px 20px;
-        border: 1px solid #EAECEE; border-bottom: none;
+        background-color: #E3F2FD; border-radius: 6px 6px 0 0; padding: 10px 20px;
+        border: 1px solid #BBDEFB; border-bottom: none;
     }
-    .stTabs [aria-selected="true"] { background-color: #D35400 !important; color: white !important; font-weight: bold; }
+    .stTabs [aria-selected="true"] { background-color: #1565C0 !important; color: white !important; font-weight: bold; }
     div[data-baseweb="select"] > div {
         white-space: normal !important;
         word-wrap: break-word !important;
@@ -37,6 +37,7 @@ st.markdown("""
 render_sidebar_branding()
 st.header(COLLEGE_NAME)
 st.title("📊 Course & Subject Insights")
+st.caption("Use the sidebar to select a course and semester. This page analyses the full batch — pass rates, subject performance, grade distributions, and statistical outliers.")
 
 data = require_data()
 if data:
@@ -112,6 +113,7 @@ if data:
 
     with tab1:
         st.subheader("Batch Overview & Pass Rates")
+        st.caption("A high-level snapshot of the selected batch — how many students were evaluated, how many belong to the current year, and the overall pass/fail breakdown.")
         
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Evaluated", total_students)
@@ -152,6 +154,7 @@ if data:
 
     with tab2:
         st.subheader("Consolidated Result Matrix")
+        st.caption("Subject-wise statistics: mean score, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F). Higher skewness means more students scored below average — a harder paper.")
         if not stats_df.empty:
             st.dataframe(stats_df, width='stretch', hide_index=True)
             if "Skewness" in stats_df.columns:
@@ -162,6 +165,7 @@ if data:
 
     with tab3:
         st.subheader("Statistical Bell Curves")
+        st.caption("Select a GPA metric or subject to view its score distribution. The histogram shows how scores are spread; the curve overlays the theoretical normal (bell) distribution. Use this to spot subjects where most students did poorly (left-skewed bell) or exceptionally well.")
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
 
@@ -226,6 +230,7 @@ if data:
     with tab4:
         st.subheader("📥 Export Master PDF Report")
         st.info("💡 **What this does:** Compiles the Executive Summary, the FULL Statistical Matrix, background-generates distribution curves for **every valid subject**, includes the Z-Score Table, and optionally attaches the Semester Comparison graph.")
+        st.caption("Click **Generate Master Report PDF** below. Once the PDF is ready, a download button will appear. The process may take a few seconds for large datasets.")
         
         course_name_string = str(course_df["COURSENAME"].iloc[0]) if not course_df.empty else "Unknown Course"
         
@@ -288,7 +293,8 @@ if data:
                         gpa_curve_figs=all_gpa_figs, 
                         subject_curve_figs=all_subject_figs, 
                         z_score_df=z_summary_df, 
-                        comparison_fig=saved_comp_fig if include_comp else None
+                        comparison_fig=saved_comp_fig if include_comp else None,
+                        overview_fig=overview_fig,
                     )
                     
                     for fig in all_subject_figs:

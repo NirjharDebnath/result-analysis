@@ -6,10 +6,26 @@ from utils.processor import require_data, apply_course_stream_filters, get_gpa_c
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Student Profile", page_icon="👤", layout="wide")
+
+st.markdown("""
+    <style>
+    .stButton>button, .stDownloadButton>button {
+        background-color: #1565C0 !important; color: white !important;
+        border-radius: 8px !important; border: none !important;
+        padding: 10px 24px !important; font-weight: 600 !important; transition: 0.3s ease-in-out !important;
+    }
+    .stButton>button:hover, .stDownloadButton>button:hover {
+        background-color: #1976D2 !important; transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(21, 101, 192, 0.3) !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 render_sidebar_branding()
 
 st.header(COLLEGE_NAME)
 st.title("👤 Student Performance Dashboard")
+st.caption("Look up any individual student's grades and GPA across all subjects. Use the course selector in the sidebar, then search for a student by roll number or name below.")
 
 data = require_data()
 if data:

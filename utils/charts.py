@@ -8,15 +8,15 @@ from matplotlib.gridspec import GridSpec
 from typing import Optional, List
 from utils.constants import SOFT_COLORS
 
-# Cool color theme requested
+# Summer/Ocean color theme — bright, clear, accessible
 THEME = {
-    "primary": "#2E4053",    # Deep Slate
-    "accent": "#D35400",     # Burnt Orange
-    "secondary": "#F4A261",  # Light Slate
-    "bg": "#FDFEFE",         # Clean White
-    "pass": "#FAD6A5",       # Green
-    "backlog": "#9C3F0F",    # Yellow
-    "lag": "#E76F51"         # Red
+    "primary":   "#1565C0",  # Deep ocean blue
+    "accent":    "#FF8F00",  # Amber/sunflower
+    "secondary": "#4FC3F7",  # Sky blue
+    "bg":        "#F0F7FF",  # Light summer sky
+    "pass":      "#66BB6A",  # Summer green
+    "backlog":   "#EF5350",  # Alert red
+    "lag":       "#FFA726",  # Warm orange
 }
 
 # Replace this specific function inside utils/charts.py
@@ -130,13 +130,13 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
     total_passed = current_passed + reapp_passed
     total_failed = total - total_passed
 
-    # Colour palette
-    PASS_COLOR    = "#27AE60"
-    FAIL_COLOR    = "#C0392B"
-    CURRENT_COLOR = "#2980B9"
-    REAPP_COLOR   = "#E67E22"
-    LATERAL_COLOR = "#8E44AD"
-    REGULAR_COLOR = "#2E4053"
+    # Colour palette — summer/ocean theme
+    PASS_COLOR    = "#43A047"  # forest green
+    FAIL_COLOR    = "#E53935"  # alert red
+    CURRENT_COLOR = "#1565C0"  # deep ocean blue
+    REAPP_COLOR   = "#FF8F00"  # amber
+    LATERAL_COLOR = "#6A1B9A"  # deep violet
+    REGULAR_COLOR = "#0288D1"  # sky blue
 
     fig = plt.figure(figsize=(16, 10))
     fig.patch.set_facecolor(THEME["bg"])
@@ -275,7 +275,7 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
         ax=ax,
     )
     ax.axvline(0, color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
-    ax.axvline(-1, color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
+    ax.axvline(-1, color=THEME["backlog"], linestyle=":", linewidth=1.5, label="-1σ")
     ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     ax.set_title(title, fontweight="bold")
     ax.set_xlabel("Z-Score", fontsize=8)
@@ -311,7 +311,7 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None, titl
     p = norm.pdf(x, full_clean.mean(), full_clean.std())
     ax.plot(x, p, 'k--', linewidth=2, label=f"Old Batch (\u03bc={full_clean.mean():.2f})")
     ax.axvline(full_clean.mean(), color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
-    ax.axvline(full_clean.mean() - full_clean.std(), color=THEME["lag"], linestyle=":", linewidth=1.5, label="-1σ")
+    ax.axvline(full_clean.mean() - full_clean.std(), color=THEME["backlog"], linestyle=":", linewidth=1.5, label="-1σ")
     ax.axvline(full_clean.mean() + full_clean.std(), color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
     
     if regular_data is not None:
@@ -344,16 +344,16 @@ def plot_semester_metric_bars(
     selected_groups: Optional[List[str]] = None,
     title: Optional[str] = None,
 ):
-    # Autumn colour palette — one distinct colour per comparison group
-    AUTUMN_PALETTE = [
-        "#D35400",  # Burnt Orange
-        "#F4A261",  # Sandy Orange
-        "#E76F51",  # Terra Cotta
-        "#9C3F0F",  # Dark Rust
-        "#FAD6A5",  # Light Peach
-        "#C0392B",  # Deep Red
-        "#F0B429",  # Amber
-        "#2E4053",  # Deep Slate (contrast anchor)
+    # Summer/ocean colour palette — one distinct colour per comparison group
+    SEASON_PALETTE = [
+        "#1565C0",  # deep ocean blue
+        "#FF8F00",  # amber/sunflower
+        "#43A047",  # forest green
+        "#E53935",  # alert red
+        "#4FC3F7",  # sky blue
+        "#AB47BC",  # violet
+        "#26A69A",  # teal
+        "#FFA726",  # warm orange
     ]
 
     fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -381,7 +381,7 @@ def plot_semester_metric_bars(
     x_labels = metric_df["GROUP_LABEL"].astype(str).tolist()
     y_vals = metric_df["AVG_VALUE"].astype(float).tolist()
     counts = metric_df["STUDENT_COUNT"].astype(int).tolist()
-    colors = [AUTUMN_PALETTE[i % len(AUTUMN_PALETTE)] for i in range(len(x_labels))]
+    colors = [SEASON_PALETTE[i % len(SEASON_PALETTE)] for i in range(len(x_labels))]
 
     bars = ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.85)
     for bar, count, y in zip(bars, counts, y_vals):
@@ -427,16 +427,16 @@ def plot_grouped_multi_metric_bars(
         ax.set_title(title, fontweight="bold")
         return fig
 
-    # Autumn colour palette — one distinct colour per metric
-    AUTUMN_PALETTE = [
-        "#8C3B0F",  # deep burnt sienna
-        "#C05621",  # rust orange
-        "#DD6B20",  # warm pumpkin
-        "#ED8936",  # soft orange
-        "#D69E2E",  # golden amber
-        "#B7791F",  # muted mustard
-        "#744210",  # earthy brown
-        "#5A2E0C"   # dark chocolate brown
+    # Summer/ocean palette — one distinct colour per metric
+    SEASON_PALETTE = [
+        "#1565C0",  # deep ocean blue
+        "#FF8F00",  # amber/sunflower
+        "#43A047",  # forest green
+        "#E53935",  # alert red
+        "#4FC3F7",  # sky blue
+        "#AB47BC",  # violet
+        "#26A69A",  # teal
+        "#FFA726",  # warm orange
     ]
     # Use seaborn's barplot for grouped bars
     sns.barplot(
@@ -444,7 +444,7 @@ def plot_grouped_multi_metric_bars(
         x="GROUP_LABEL",
         y="AVG_VALUE",
         hue="METRIC",
-        palette=AUTUMN_PALETTE[:len(selected_metrics)],
+        palette=SEASON_PALETTE[:len(selected_metrics)],
         edgecolor="black",
         alpha=0.85,
         ax=ax

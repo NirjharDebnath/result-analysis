@@ -12,13 +12,13 @@ st.set_page_config(page_title="Semester Comparison", page_icon="📈", layout="w
 st.markdown("""
     <style>
     .stButton>button, .stDownloadButton>button {
-        background-color: #D35400 !important; color: white !important; 
+        background-color: #1565C0 !important; color: white !important; 
         border-radius: 8px !important; border: none !important; 
         padding: 10px 24px !important; font-weight: 600 !important; transition: 0.3s ease-in-out !important;
     }
     .stButton>button:hover, .stDownloadButton>button:hover {
-        background-color: #E67E22 !important; transform: translateY(-2px) !important;
-        box-shadow: 0 4px 10px rgba(211, 84, 0, 0.3) !important;
+        background-color: #1976D2 !important; transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(21, 101, 192, 0.3) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -26,6 +26,7 @@ st.markdown("""
 render_sidebar_branding()
 st.header(COLLEGE_NAME)
 st.title("📈 Inter-Semester & Session Comparison")
+st.caption("Compare GPA metrics across multiple semesters or exam sessions for the same course. Upload result files from different semesters first, then use this page to visualise trends over time.")
 
 data = require_data()
 if data:
@@ -38,9 +39,12 @@ if data:
         st.stop()
 
     st.info("""
-        💡 **How to use this page:** 1. Select **multiple GPA Metrics** (e.g., SGPA3, SGPA4, SGPA8).
-        2. Select the **Groups** (Semesters/Exam Sessions) to view.
-        3. The graph will group your selected metrics side-by-side for direct comparison.
+        💡 **How to use this page:**
+        1. Select **one or more GPA Metrics** to compare (e.g., SGPA from Semester 3, 4, 8).
+        2. Choose how failing grades ('F') are counted — strict average includes zeros, pass average ignores failed students.
+        3. Pick the **Groups** (semester / exam sessions) you want to visualise side-by-side.
+        4. The bar chart groups your selected metrics for direct comparison across sessions.
+        5. After generating, the chart is also saved and can be included in the PDF report from the Course Insights page.
     """)
 
     gpa_options = get_gpa_columns(course_df)

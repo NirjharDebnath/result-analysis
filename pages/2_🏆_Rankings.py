@@ -6,10 +6,26 @@ from utils.processor import require_data, apply_course_stream_filters, get_gpa_c
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Rankings", page_icon="🏆", layout="wide")
+
+st.markdown("""
+    <style>
+    .stButton>button, .stDownloadButton>button {
+        background-color: #1565C0 !important; color: white !important;
+        border-radius: 8px !important; border: none !important;
+        padding: 10px 24px !important; font-weight: 600 !important; transition: 0.3s ease-in-out !important;
+    }
+    .stButton>button:hover, .stDownloadButton>button:hover {
+        background-color: #1976D2 !important; transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(21, 101, 192, 0.3) !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 render_sidebar_branding()
 
 st.header(COLLEGE_NAME)
 st.title("🏆 Student Rankings")
+st.caption("Rank students by GPA, individual subject marks, or total marks. Use the sidebar to choose a course, then pick your ranking method below.")
 
 data = require_data()
 if data:
@@ -20,6 +36,8 @@ if data:
     
     # Filter down to the specific course and semester
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
+
+    st.info("📌 **How to rank:** Choose a ranking basis (GPA / Subject / Total Marks), pick a ranking type, then select the specific column to rank by. The table will appear below with rank positions.")
 
     ranking_mode = st.radio("Ranking Basis", ["GPA Metrics", "By Subject", "Total Marks"], horizontal=True)
     rank_type = st.selectbox("Ranking Type", ["Standard", "Dense"])
