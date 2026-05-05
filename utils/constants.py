@@ -161,6 +161,7 @@ UI_THEME = {
     "card": "#FFFFFF",
     "border": "#E7ECEF",
 }
+
 SOFT_COLORS = SAGE_DUSTY
 
 LOGO_CANDIDATE_PATHS = [
