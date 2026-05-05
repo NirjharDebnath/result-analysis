@@ -221,7 +221,7 @@ if uploaded_files:
             st.session_state["subject_cols"] = subject_cols
 
             with st.expander("🔍 Preview Dataset (first 50 rows)", expanded=True):
-                st.dataframe(df.head(50), use_container_width=True)
+                st.dataframe(df.head(50), width='stretch')
 
             col1, col2 = st.columns(2)
             with col1:

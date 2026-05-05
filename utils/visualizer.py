@@ -9,7 +9,7 @@ from utils.constants import LOGO_CANDIDATE_PATHS, SOFT_COLORS
 
 def downloadable_plot(fig, filename: str):
     fig.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", bbox_inches="tight", dpi=150)
     st.download_button(
@@ -17,7 +17,7 @@ def downloadable_plot(fig, filename: str):
         data=buffer.getvalue(),
         file_name=filename,
         mime="image/png",
-        use_container_width=True,
+        width='stretch',
     )
     plt.close(fig)
 
@@ -27,7 +27,7 @@ def download_table_button(df: pd.DataFrame, label: str, filename: str):
         data=df.to_csv(index=False).encode("utf-8"),
         file_name=filename,
         mime="text/csv",
-        use_container_width=True,
+        width='stretch',
     )
 
 def resolve_logo_path() -> Optional[str]:

@@ -161,7 +161,7 @@ UI_THEME = {
     "card": "#FFFFFF",
     "border": "#E7ECEF",
 }
-SOFT_COLORS = SOFT_AUTUMN
+SOFT_COLORS = SAGE_DUSTY
 
 LOGO_CANDIDATE_PATHS = [
     "assets/kgec_logo.png",

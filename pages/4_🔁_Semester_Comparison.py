@@ -220,7 +220,7 @@ if data:
         selected_groups=selected_groups,
         title="Combined GPA Comparison"
     )
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
     st.session_state["comparison_fig"] = fig
 
     with st.expander("📝 View Comparison Data Table"):
@@ -228,7 +228,7 @@ if data:
             (comparison_results["GROUP_LABEL"].isin(selected_groups)) & 
             (comparison_results["METRIC"].isin(selected_metrics))
         ].sort_values(["GROUP_LABEL", "METRIC"])
-        st.dataframe(display_table, hide_index=True, use_container_width=True)
+        st.dataframe(display_table, hide_index=True, width='stretch')
         download_table_button(display_table, "Download Comparison CSV", "semester_comparison.csv")
 
 render_footer()

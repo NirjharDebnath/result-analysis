@@ -213,7 +213,7 @@ if data:
         
         st.divider()
 
-        st.pyplot(overview_fig, use_container_width=True)
+        st.pyplot(overview_fig, width="stretch")
 
         st.divider()
 
@@ -231,7 +231,7 @@ if data:
                     "Count": c, 
                     "% of Class": f"{(c/total_students*100):.1f}%"
                 })
-            st.dataframe(pd.DataFrame(summary_data), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(summary_data), hide_index=True, width="stretch")
             
         with col2:
             st.write("") 
