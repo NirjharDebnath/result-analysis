@@ -65,37 +65,10 @@ def create_master_report_pdf(
     # --- Page 2: Combined Batch Overview + Executive Summary table, then Subject Statistics ---
     pdf.add_page()
 
-    # Combined table: batch overview data + executive summary in one place
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 9, clean_text("Batch Overview & Executive Summary"), ln=True)
-    pdf.ln(2)
-
-    # Header row
-    pdf.set_font("Arial", "B", 9)
-    pdf.cell(90, 7, "Category / Metric", border=1, align="C")
-    pdf.cell(50, 7, "Count / Value", border=1, align="C")
-    pdf.cell(50, 7, "% of Class", border=1, align="C")
-    pdf.ln()
-    pdf.set_font("Arial", "", 9)
-
-    # Batch overview rows
-    if batch_overview_data:
-        for row in batch_overview_data:
-            pdf.cell(90, 7, clean_text(str(row.get("Status Category", ""))), border=1)
-            pdf.cell(50, 7, clean_text(str(row.get("Count", ""))), border=1, align="C")
-            pdf.cell(50, 7, clean_text(str(row.get("% of Class", ""))), border=1, align="C")
-            pdf.ln()
-
-    # Executive summary rows (no % column applicable)
-    for key, val in summary_table.items():
-        pdf.cell(90, 7, clean_text(f"{key}"), border=1)
-        pdf.cell(50, 7, clean_text(f"{val}"), border=1, align="C")
-        pdf.cell(50, 7, "N/A", border=1, align="C")
-        pdf.ln()
-
-    pdf.ln(5)
-
-    # Subject Statistics Matrix on the same page (continued)
+    # table format summary in one place
+    #empty
+    
+    # Subject Statistics Matrix on the same page (con# Subject Statistics Matrix on the same page (continued)tinued)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 10, "Subject Performance Statistics", ln=True)
     pdf.ln(5)
