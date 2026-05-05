@@ -293,10 +293,40 @@ def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key:
 
     return filtered
 
+def fix_truncated_suffixes(df, column="COURSENAME"):
+    target_words = [
+        "Engineering",
+        "Technology",
+        "Application"
+    ]
+
+    target_map = {w.lower(): w for w in target_words}
+
+    def complete_course(course):
+        if pd.isna(course):
+            return course
+
+        words = str(course).strip().split()
+        if not words:
+            return course
+
+        last_word = words[-1].lower()
+
+        for target_lower, target_original in target_map.items():
+            if target_lower.startswith(last_word):
+                words[-1] = target_original
+                return " ".join(words)
+
+        return course
+
+    df[column] = df[column].apply(complete_course)
+    return df
+
 def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
     df = st.session_state.get("validated_df")
     subject_cols = st.session_state.get("subject_cols")
     if df is None or subject_cols is None:
         st.warning("Please upload and validate a dataset on the Upload Page first.")
         return None
+    df = fix_truncated_suffixes(df)
     return df, subject_cols

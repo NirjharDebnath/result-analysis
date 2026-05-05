@@ -1,23 +1,122 @@
 # pages/2_🏆_Rankings.py
 import pandas as pd
 import streamlit as st
-from utils.constants import COLLEGE_NAME
+from utils.constants import COLLEGE_NAME, SOFT_COLORS, UI_THEME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Rankings", page_icon="🏆", layout="wide")
 
-st.markdown("""
+THEME = SOFT_COLORS
+
+st.markdown(f"""
     <style>
-    .stButton>button, .stDownloadButton>button {
-        background-color: #1565C0 !important; color: white !important;
-        border-radius: 8px !important; border: none !important;
-        padding: 10px 24px !important; font-weight: 600 !important; transition: 0.3s ease-in-out !important;
-    }
-    .stButton>button:hover, .stDownloadButton>button:hover {
-        background-color: #1976D2 !important; transform: translateY(-2px) !important;
-        box-shadow: 0 4px 10px rgba(21, 101, 192, 0.3) !important;
-    }
+
+        /* Main buttons */
+        .stButton>button, .stDownloadButton>button {{
+            background-color: {THEME["primary"]} !important;
+            color: white !important;
+            border-radius: 8px !important;
+            border: none !important;
+            padding: 10px 24px !important;
+            font-weight: 600 !important;
+            transition: 0.3s ease-in-out !important;
+        }}
+
+        .stButton>button:hover, .stDownloadButton>button:hover {{
+            background-color: {THEME["button_hover"]} !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 10px {THEME["grid"]} !important;
+        }}
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {{
+            gap: 10px;
+        }}
+
+        .stTabs [data-baseweb="tab"] {{
+            background-color: {THEME["bg"]};
+            border-radius: 6px 6px 0 0;
+            padding: 10px 20px;
+            border: 1px solid {THEME["grid"]};
+            border-bottom: none;
+            color: #2F3A45;
+        }}
+
+        .stTabs [aria-selected="true"] {{
+            background-color: {THEME["primary"]} !important;
+            color: white !important;
+            font-weight: bold;
+        }}
+
+        /* Selectbox text wrapping */
+        div[data-baseweb="select"] > div {{
+            white-space: normal !important;
+            word-wrap: break-word !important;
+        }}
+
+        /* Main app background */
+        .stApp {{
+            background-color: {THEME["bg"]};
+        }}
+
+        /* Sidebar */
+        section[data-testid="stSidebar"] {{
+            background-color: {THEME["sidebar"]} !important;
+        }}
+
+        /* Caption */
+        div[data-testid="stCaptionContainer"] {{
+            color: {UI_THEME["text"]} !important;
+            opacity: 0.85;
+        }}
+
+        /* Success box */
+        div[data-testid="stAlert"][kind="success"] {{
+            background-color: {THEME["success_bg"]} !important;
+            border-left: 5px solid {THEME["pass"]} !important;
+            color: #2F3A45 !important;
+        }}
+
+        /* Info box */
+        div[data-testid="stAlert"][kind="info"] {{
+            background-color: {THEME["info_bg"]} !important;
+            border-left: 5px solid {THEME["primary"]} !important;
+            color: #2F3A45 !important;
+        }}
+
+        /* Warning box */
+        div[data-testid="stAlert"][kind="warning"] {{
+            background-color: {THEME["warning_bg"]} !important;
+            border-left: 5px solid {THEME["lag"]} !important;
+            color: #2F3A45 !important;
+        }}
+
+        /* Error box */
+        div[data-testid="stAlert"][kind="error"] {{
+            background-color: {THEME["error_bg"]} !important;
+            border-left: 5px solid {THEME["fail"]} !important;
+            color: #2F3A45 !important;
+        }}
+        
+        /* Selectbox selected item */
+        div[data-baseweb="select"] > div {{
+            # background-color: {THEME["bg"]} !important;
+            border: 1px solid {THEME["grid"]} !important;
+            color: #2F3A45 !important;
+        }}
+
+        /* Dropdown hover */
+        div[data-baseweb="option"]:hover {{
+            background-color: {THEME["accent"]} !important;
+            color: #2F3A45 !important;
+        }}
+
+        /* Selected dropdown option */
+        div[aria-selected="true"][role="option"] {{
+            background-color: {THEME["primary"]} !important;
+            color: white !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 

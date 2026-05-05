@@ -8,96 +8,115 @@ from matplotlib.gridspec import GridSpec
 from typing import Optional, List
 from utils.constants import SOFT_COLORS
 
-# Summer/Ocean color theme — bright, clear, accessible
-THEME = {
-    "primary":   "#1565C0",  # Deep ocean blue
-    "accent":    "#FF8F00",  # Amber/sunflower
-    "secondary": "#4FC3F7",  # Sky blue
-    "bg":        "#F0F7FF",  # Light summer sky
-    "pass":      "#66BB6A",  # Summer green
-    "backlog":   "#EF5350",  # Alert red
-    "lag":       "#FFA726",  # Warm orange
-}
+# Active theme
+THEME = SOFT_COLORS
 
-# Replace this specific function inside utils/charts.py
+# Semantic color mapping
+PASS_COLOR = THEME["pass"]
+FAIL_COLOR = THEME["fail"]
+BACKLOG_COLOR = THEME["backlog"]
+LAG_COLOR = THEME["lag"]
+
+PRIMARY_COLOR = THEME["primary"]
+ACCENT_COLOR = THEME["accent"]
+GRID_COLOR = THEME["grid"]
+BG_COLOR = THEME["bg"]
+
+CURRENT_COLOR = PRIMARY_COLOR
+REAPP_COLOR = LAG_COLOR
+LATERAL_COLOR = ACCENT_COLOR
+REGULAR_COLOR = GRID_COLOR
+
+# Reusable palette
+SEASON_PALETTE = [
+    PRIMARY_COLOR,
+    ACCENT_COLOR,
+    PASS_COLOR,
+    FAIL_COLOR,
+    BACKLOG_COLOR,
+    LAG_COLOR,
+    GRID_COLOR,
+    ACCENT_COLOR,
+]
+
+
 def plot_status_bars(status_counts: pd.Series, total_students: int = None):
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    fig.patch.set_facecolor(THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
-    
-    # Order categories logically
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
     base_categories = ["Current Batch", "Backlog (Current Batch)", "Old Batch (Re-appearing)", "Year Lag"]
     ordered_categories = [c for c in base_categories if c in status_counts.index]
     ordered_categories += [c for c in status_counts.index if c not in base_categories]
-    
+
     status_counts = status_counts.reindex(ordered_categories, fill_value=0)
     categories = status_counts.index.tolist()
     counts = status_counts.values.tolist()
-    
+
     colors = []
     for cat in categories:
         cat_upper = cat.upper()
-        if cat_upper == "CURRENT BATCH": colors.append(THEME["pass"]) # All Clear
-        elif "BACKLOG" in cat_upper: colors.append(THEME["backlog"])
-        elif "OLD" in cat_upper: colors.append(THEME["secondary"])
-        elif "LAG" in cat_upper: colors.append(THEME["lag"])
-        else: colors.append(THEME["primary"])
-    
+        if cat_upper == "CURRENT BATCH":
+            colors.append(PASS_COLOR)
+        elif "BACKLOG" in cat_upper:
+            colors.append(BACKLOG_COLOR)
+        elif "OLD" in cat_upper:
+            colors.append(REAPP_COLOR)
+        elif "LAG" in cat_upper:
+            colors.append(LAG_COLOR)
+        else:
+            colors.append(PRIMARY_COLOR)
+
     bars = ax.bar(categories, counts, color=colors, edgecolor='black', alpha=0.85)
-    
-    # Calculate percentages for the annotations
+
     total = total_students if total_students else sum(counts)
-    
+
     for bar, count in zip(bars, counts):
         height = bar.get_height()
         percentage = (count / total) * 100 if total > 0 else 0
-        
-        # Two-line annotation: Count and Percentage
+
         label_text = f'{int(count)}\n({percentage:.1f}%)' if count > 0 else '0'
-        
-        ax.annotate(label_text,
-                    xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 4),  
-                    textcoords="offset points",
-                    ha='center', va='bottom', fontweight='bold', fontsize=9)
-                    
-    # Make X-Axis labels much cleaner and wrap the text
+
+        ax.annotate(
+            label_text,
+            xy=(bar.get_x() + bar.get_width() / 2, height),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha='center',
+            va='bottom',
+            fontweight='bold',
+            fontsize=9
+        )
+
     display_labels = []
     for cat in categories:
-        if cat == "Current Batch": display_labels.append("Current Batch\n(All Clear)")
-        elif cat == "Backlog (Current Batch)": display_labels.append("Current Batch\n(Backlog)")
-        else: display_labels.append(cat.replace(" (", "\n(")) # wrap text automatically
-        
+        if cat == "Current Batch":
+            display_labels.append("Current Batch\n(All Clear)")
+        elif cat == "Backlog (Current Batch)":
+            display_labels.append("Current Batch\n(Backlog)")
+        else:
+            display_labels.append(cat.replace(" (", "\n("))
+
     ax.set_xticks(range(len(display_labels)))
     ax.set_xticklabels(display_labels, rotation=0, ha='center', fontsize=9, fontweight='semibold')
-    
+
     ax.set_ylabel("Number of Students")
     ax.set_title("Overall Batch Status Breakdown", fontweight='bold')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    
-    # Extend Y-axis slightly to make room for the two-line text annotations
+
     ax.set_ylim(0, max(counts) * 1.25 if counts else 10)
-    
+
     plt.tight_layout()
     return fig
 
-def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Series, lateral_mask: pd.Series):
-    """
-    Creates a 5-subplot executive overview figure for Tab 1.
 
-    Subplots:
-    1. Current Year Students vs Backlog (Reappearing) — composition
-    2. Current Year Students: Passed vs Failed
-    3. Old Batch (Reappearing): Passed vs Failed (or "No reappearing" notice)
-    4. Lateral vs Regular Students among the current class
-    5. Overall: Passed vs Failed (all students)
-    """
+def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Series, lateral_mask: pd.Series):
     total = len(filtered_df)
 
     if total == 0:
         fig, ax = plt.subplots(1, 1, figsize=(8, 4))
-        fig.patch.set_facecolor(THEME["bg"])
+        fig.patch.set_facecolor(BG_COLOR)
         ax.text(0.5, 0.5, "No data available", ha="center", va="center", transform=ax.transAxes)
         ax.axis("off")
         return fig
@@ -108,38 +127,27 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
     n_current = len(current_df)
     n_reappearing = len(reappearing_df)
 
-    # 2. Current Year pass vs fail
     current_passed = int((current_df["STATUS"] == "Current Batch").sum())
     current_failed = n_current - current_passed
 
-    # 3. Old-batch / reappearing pass vs fail
     if n_reappearing > 0 and "SEMESTER RESULT" in reappearing_df.columns:
         reapp_passed = int(
             reappearing_df["SEMESTER RESULT"].str.upper().str.contains("PASS", na=False).sum()
         )
     else:
         reapp_passed = 0
+
     reapp_failed = n_reappearing - reapp_passed
 
-    # 4. Lateral vs Regular (within current class only)
     lateral_in_current = current_class_mask & lateral_mask
     n_lateral = int(lateral_in_current.sum())
     n_regular = n_current - n_lateral
 
-    # 5. Overall pass vs fail
     total_passed = current_passed + reapp_passed
     total_failed = total - total_passed
 
-    # Colour palette — summer/ocean theme
-    PASS_COLOR    = "#43A047"  # forest green
-    FAIL_COLOR    = "#E53935"  # alert red
-    CURRENT_COLOR = "#1565C0"  # deep ocean blue
-    REAPP_COLOR   = "#FF8F00"  # amber
-    LATERAL_COLOR = "#6A1B9A"  # deep violet
-    REGULAR_COLOR = "#0288D1"  # sky blue
-
     fig = plt.figure(figsize=(16, 10))
-    fig.patch.set_facecolor(THEME["bg"])
+    fig.patch.set_facecolor(BG_COLOR)
     gs = GridSpec(2, 6, figure=fig, hspace=0.55, wspace=0.5)
 
     ax1 = fig.add_subplot(gs[0, 0:2])
@@ -149,9 +157,8 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
     ax5 = fig.add_subplot(gs[1, 4:6])
 
     for ax in (ax1, ax2, ax3, ax4, ax5):
-        ax.set_facecolor(THEME["bg"])
+        ax.set_facecolor(BG_COLOR)
 
-    # ── Helper: donut pie chart ──────────────────────────────────────────────
     def _donut(ax, values, labels, colors, title):
         nonzero = [v for v in values if v > 0]
         if not nonzero:
@@ -159,6 +166,7 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
             ax.set_title(title, fontweight="bold", fontsize=10)
             ax.axis("off")
             return
+
         wedges, _, autotexts = ax.pie(
             values,
             labels=None,
@@ -168,9 +176,11 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
             wedgeprops=dict(width=0.5),
             pctdistance=0.75,
         )
+
         for at in autotexts:
             at.set_fontsize(9)
             at.set_fontweight("bold")
+
         ax.legend(
             wedges,
             [f"{l}  ({v})" for l, v in zip(labels, values)],
@@ -180,9 +190,9 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
             fontsize=8,
             frameon=False,
         )
+
         ax.set_title(title, fontweight="bold", fontsize=10)
 
-    # ── Subplot 1: Current Year vs Reappearing ───────────────────────────────
     _donut(
         ax1,
         [n_current, n_reappearing],
@@ -191,7 +201,6 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
         "Current Year vs\nReappearing Students",
     )
 
-    # ── Subplot 2: Current Year Pass / Fail ──────────────────────────────────
     _donut(
         ax2,
         [current_passed, current_failed],
@@ -200,7 +209,6 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
         "Current Year Students\nPass vs Fail",
     )
 
-    # ── Subplot 3: Old Batch Pass / Fail ─────────────────────────────────────
     _donut(
         ax3,
         [reapp_passed, reapp_failed],
@@ -209,12 +217,12 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
         "Reappearing Students\nPass vs Fail",
     )
 
-    # ── Subplot 4: Lateral vs Regular (horizontal bar) ───────────────────────
     categories = ["Regular Students", "Lateral Entry"]
     counts = [n_regular, n_lateral]
     bar_colors = [REGULAR_COLOR, LATERAL_COLOR]
 
     bars = ax4.barh(categories, counts, color=bar_colors, edgecolor="black", alpha=0.85, height=0.4)
+
     for bar, count in zip(bars, counts):
         pct = (count / n_current * 100) if n_current > 0 else 0
         ax4.annotate(
@@ -227,18 +235,19 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
             fontweight="bold",
             fontsize=10,
         )
+
     ax4.set_title(
         "Lateral Entry vs Regular Students\n(Current Batch Only — Reappearing excluded)",
         fontweight="bold",
         fontsize=10,
     )
+
     ax4.set_xlabel("Number of Students")
     ax4.set_xlim(0, (max(counts) * 1.55) if max(counts) > 0 else 10)
     ax4.spines["top"].set_visible(False)
     ax4.spines["right"].set_visible(False)
     ax4.grid(axis="x", linestyle="--", alpha=0.4)
 
-    # ── Subplot 5: Overall Pass / Fail ───────────────────────────────────────
     _donut(
         ax5,
         [total_passed, total_failed],
@@ -254,191 +263,152 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
 
 def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribution"):
     fig, ax = plt.subplots(figsize=(5, 2.5))
-    fig.patch.set_facecolor(THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
 
     if z_df.empty or "Z-Score" not in z_df.columns:
         ax.text(0.5, 0.5, "No Z-score data available", ha="center", va="center")
-        ax.set_title(title, fontweight="bold")
-        ax.set_xlabel("Z-Score")
-        ax.set_ylabel("Number of Students")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
         return fig
 
     sns.histplot(
         z_df["Z-Score"],
         bins=12,
-        color=THEME["secondary"],
+        color=ACCENT_COLOR,
         edgecolor="black",
         alpha=0.6,
         ax=ax,
     )
-    ax.axvline(0, color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
-    ax.axvline(-1, color=THEME["backlog"], linestyle=":", linewidth=1.5, label="-1σ")
-    ax.axvline(1, color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
-    ax.set_title(title, fontweight="bold")
-    ax.set_xlabel("Z-Score", fontsize=8)
-    ax.set_ylabel("Number of Students", fontsize=8)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis="y", linestyle="--", alpha=0.5)
-    ax.legend()
+
+    ax.axvline(0, color=PRIMARY_COLOR, linestyle="--", linewidth=1.5)
+    ax.axvline(-1, color=BACKLOG_COLOR, linestyle=":", linewidth=1.5)
+    ax.axvline(1, color=ACCENT_COLOR, linestyle=":", linewidth=1.5)
+
     plt.tight_layout()
     return fig
 
-def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None, title: str = "Distribution", is_grade_scale: bool = False):
-    fig, ax = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor(THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
-    
+
+def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
+                      title: str = "Distribution", is_grade_scale: bool = False):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
     full_clean = full_data.dropna()
-    
+
     if full_clean.empty or full_clean.std() == 0:
-        ax.text(0.5, 0.5, "Not enough variance for curve", ha='center', va='center')
+        ax.text(0.5, 0.5, "Not enough variance for curve",
+                ha='center', va='center', fontsize=14)
         return fig
-        
-    # If plotting grades, force bins to align nicely with the 0-10 scale
+
     bins = [-0.5, 0.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5] if is_grade_scale else 15
-    sns.histplot(full_clean, stat="density", color=THEME["secondary"], alpha=0.4, label="Full Class", bins=bins, ax=ax)
-    
-    # Calculate Bell Curve
+
+    sns.histplot(
+        full_clean,
+        stat="density",
+        color=ACCENT_COLOR,
+        alpha=0.4,
+        bins=bins,
+        ax=ax
+    )
+
     xmin, xmax = ax.get_xlim()
-    if is_grade_scale: 
-        xmin, xmax = -1, 11 # Fix axis range for grades
-        
-    x = np.linspace(xmin, xmax, 100)
-    p = norm.pdf(x, full_clean.mean(), full_clean.std())
-    ax.plot(x, p, 'k--', linewidth=2, label=f"Old Batch (\u03bc={full_clean.mean():.2f})")
-    ax.axvline(full_clean.mean(), color=THEME["primary"], linestyle="--", linewidth=1.5, label="Mean (0σ)")
-    ax.axvline(full_clean.mean() - full_clean.std(), color=THEME["backlog"], linestyle=":", linewidth=1.5, label="-1σ")
-    ax.axvline(full_clean.mean() + full_clean.std(), color=THEME["accent"], linestyle=":", linewidth=1.5, label="+1σ")
-    
-    if regular_data is not None:
-        reg_clean = regular_data.dropna()
-        if not reg_clean.empty and reg_clean.std() > 0:
-            p_reg = norm.pdf(x, reg_clean.mean(), reg_clean.std())
-            ax.plot(x, p_reg, color=THEME["accent"], linewidth=2.5, label=f"Current Batch (\u03bc={reg_clean.mean():.2f})")
-            
-    ax.set_title(title, fontweight='bold')
-    
-    # --- The Fix: Injecting the Grade Letters ---
     if is_grade_scale:
-        ax.set_xlabel("Grades", fontweight='bold')
-        ax.set_xticks([0, 5, 6, 7, 8, 9, 10])
-        # ax.set_xticklabels(['F', 'D', 'C', 'B', 'A', 'E', 'O'], fontweight='bold')
-        ax.set_xticklabels(['F(0)', 'D(5)', 'C(6)', 'B(7)', 'A(8)', 'E(9)', 'O(0)'])
-        ax.set_xlim(-1, 11)
-    else:
-        ax.set_xlabel("GPA Metric", fontweight='bold')
-        
-    ax.set_ylabel("Density")
-    ax.legend()
-    ax.grid(axis="y", linestyle="--", alpha=0.5)
+        xmin, xmax = -1, 11
+
+    x = np.linspace(xmin, xmax, 300)
+    mean = full_clean.mean()
+    std = full_clean.std()
+    p = norm.pdf(x, mean, std)
+
+    # Plot normal curve
+    ax.plot(x, p, 'k--', linewidth=2, label="Normal Curve")
+
+    # Vertical lines
+    ax.axvline(mean, color=PRIMARY_COLOR, linestyle="--", linewidth=2)
+    ax.axvline(mean - std, color=BACKLOG_COLOR, linestyle=":", linewidth=2)
+    ax.axvline(mean + std, color=ACCENT_COLOR, linestyle=":", linewidth=2)
+    
+    # Top aligned labels
+    label_y = 1.02  # slightly above plot area
+
+    ax.text(
+        mean,
+        label_y,
+        f"Mean = {mean:.2f}",
+        transform=ax.get_xaxis_transform(),
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        color="black",
+        # bbox=dict(boxstyle="round,pad=0.3", alpha=0.8)
+    )
+
+    ax.text(
+        mean - std,
+        label_y,
+        f"-1σ = {mean-std:.2f}",
+        transform=ax.get_xaxis_transform(),
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="black",
+        # bbox=dict(boxstyle="round,pad=0.3", alpha=0.8)
+    )
+
+    ax.text(
+        mean + std,
+        label_y,
+        f"+1σ = {mean+std:.2f}",
+        transform=ax.get_xaxis_transform(),
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="black",
+        # bbox=dict(boxstyle="round,pad=0.3", alpha=0.8)
+    )
+    # Titles and axis labels
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.set_xlabel("Values", fontsize=12)
+    ax.set_ylabel("Density", fontsize=12)
+
+    ax.legend(loc="upper right")
+    ax.grid(alpha=0.2)
+
     plt.tight_layout()
     return fig
 
-def plot_semester_metric_bars(
-    comparison_df: pd.DataFrame,
-    metric: str,
-    selected_groups: Optional[List[str]] = None,
-    title: Optional[str] = None,
-):
-    # Summer/ocean colour palette — one distinct colour per comparison group
-    SEASON_PALETTE = [
-        "#1565C0",  # deep ocean blue
-        "#FF8F00",  # amber/sunflower
-        "#43A047",  # forest green
-        "#E53935",  # alert red
-        "#4FC3F7",  # sky blue
-        "#AB47BC",  # violet
-        "#26A69A",  # teal
-        "#FFA726",  # warm orange
-    ]
 
+def plot_semester_metric_bars(comparison_df: pd.DataFrame, metric: str, selected_groups: Optional[List[str]] = None, title: Optional[str] = None):
     fig, ax = plt.subplots(figsize=(10, 4.5))
-    fig.patch.set_facecolor(THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
-
-    if comparison_df.empty or "METRIC" not in comparison_df.columns:
-        ax.text(0.5, 0.5, "No comparison data available", ha="center", va="center")
-        ax.set_title(title or f"{metric} Comparison", fontweight="bold")
-        return fig
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
 
     metric_df = comparison_df[comparison_df["METRIC"] == metric].copy()
+
     if selected_groups:
         metric_df = metric_df[metric_df["GROUP_LABEL"].isin(selected_groups)].copy()
 
-    if metric_df.empty:
-        ax.text(0.5, 0.5, "No data for selected groups", ha="center", va="center")
-        ax.set_title(title or f"{metric} Comparison", fontweight="bold")
-        return fig
-
-    # Sort bars by semester order then group label
-    sort_cols = ["SEMESTER_ORDER", "GROUP_LABEL"] if "SEMESTER_ORDER" in metric_df.columns else ["GROUP_LABEL"]
-    metric_df = metric_df.sort_values(sort_cols)
-
     x_labels = metric_df["GROUP_LABEL"].astype(str).tolist()
     y_vals = metric_df["AVG_VALUE"].astype(float).tolist()
-    counts = metric_df["STUDENT_COUNT"].astype(int).tolist()
+
     colors = [SEASON_PALETTE[i % len(SEASON_PALETTE)] for i in range(len(x_labels))]
 
-    bars = ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.85)
-    for bar, count, y in zip(bars, counts, y_vals):
-        ax.annotate(
-            f"{y:.2f}\n(n={count})",
-            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-            xytext=(0, 3),
-            textcoords="offset points",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
+    ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.85)
 
-    ax.set_title(title or f"{metric} — Average Comparison", fontweight="bold")
-    ax.set_ylabel(f"Average {metric}")
-    ax.set_xlabel("Group")
-    ax.set_ylim(bottom=0, top=(max(y_vals) * 1.2) if y_vals else 10)
-    ax.grid(axis="y", linestyle="--", alpha=0.4)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    plt.xticks(rotation=15, ha="right")
     plt.tight_layout()
     return fig
 
-def plot_grouped_multi_metric_bars(
-    comparison_df: pd.DataFrame,
-    selected_metrics: list,
-    selected_groups: list,
-    title: str = "Multi-Metric Comparison"
-):
-    fig, ax = plt.subplots(figsize=(10, 5))
-    fig.patch.set_facecolor(THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
 
-    # Filter data for selected metrics and groups
+def plot_grouped_multi_metric_bars(comparison_df: pd.DataFrame, selected_metrics: list, selected_groups: list, title: str = "Multi-Metric Comparison"):
+    fig, ax = plt.subplots(figsize=(10, 5))
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
     df_filtered = comparison_df[
         (comparison_df["METRIC"].isin(selected_metrics)) &
         (comparison_df["GROUP_LABEL"].isin(selected_groups))
     ]
 
-    if df_filtered.empty:
-        ax.text(0.5, 0.5, "No data available for the selected combination", ha="center", va="center")
-        ax.set_title(title, fontweight="bold")
-        return fig
-
-    # Summer/ocean palette — one distinct colour per metric
-    SEASON_PALETTE = [
-        "#1565C0",  # deep ocean blue
-        "#FF8F00",  # amber/sunflower
-        "#43A047",  # forest green
-        "#E53935",  # alert red
-        "#4FC3F7",  # sky blue
-        "#AB47BC",  # violet
-        "#26A69A",  # teal
-        "#FFA726",  # warm orange
-    ]
-    # Use seaborn's barplot for grouped bars
     sns.barplot(
         data=df_filtered,
         x="GROUP_LABEL",
@@ -450,38 +420,5 @@ def plot_grouped_multi_metric_bars(
         ax=ax
     )
 
-    # Add value annotations on top of each bar
-    for container in ax.containers:
-        ax.bar_label(
-            container,
-            fmt='%.2f',
-            padding=6,
-            fontsize=9,
-            color="black",
-            bbox=dict(
-                facecolor="white",
-                edgecolor="none",
-                alpha=0.7,
-                boxstyle="round,pad=0.2"
-            ),
-            rotation=90
-        )
-
-    ax.set_title(title, fontweight="bold")
-    ax.set_ylabel("Average Score")
-    ax.set_xlabel("Semester / Exam Session")
-    
-    # Dynamic Y-limit to make room for the legend
-    max_val = df_filtered["AVG_VALUE"].max()
-    ax.set_ylim(bottom=0, top=(max_val * 1.3) if max_val else 10)
-    
-    ax.grid(axis="y", linestyle="--", alpha=0.4)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    
-    # Move legend outside the plot so it doesn't cover bars
-    ax.legend(title="GPA Metrics", bbox_to_anchor=(1.01, 1), loc='upper left')
-    
-    plt.xticks(rotation=15, ha="right")
     plt.tight_layout()
     return fig
