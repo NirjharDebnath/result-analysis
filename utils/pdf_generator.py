@@ -164,6 +164,7 @@ def create_master_report_pdf(
                 pdf.ln(3)
 
     def _draw_curve_pair(curve_fig, pie_fig):
+        """Render a curve figure and optional pie figure side-by-side on the current PDF page."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_curve:
             curve_fig.savefig(tmp_curve.name, format="png", bbox_inches="tight", dpi=150)
             y_start = pdf.get_y()

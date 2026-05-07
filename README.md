@@ -256,8 +256,8 @@ Statistical and grouping logic.
 
 ### `utils/charts.py`
 
-All chart-drawing functions.  Each function returns a `matplotlib.figure.Figure` object —
-it is never rendered directly; the caller passes it to `st.pyplot()` or `fig.savefig()`.
+All chart-drawing functions. Most return a single `matplotlib.figure.Figure`; `plot_normal_curve`
+returns a pair `(curve_figure, pie_figure_or_none)`.
 
 **Shared theme (`THEME` dict):**
 A summer/ocean colour palette used across all charts:
@@ -273,7 +273,7 @@ A summer/ocean colour palette used across all charts:
 |----------|-----------|---------|
 | `plot_status_bars(status_counts, total)` | Vertical bar chart with count + percentage annotations | Page 1 Tab 1 (PDF only) |
 | `plot_executive_overview(df, current_mask, lateral_mask)` | 5-subplot figure: 3 donut pies + 1 horizontal bar + 1 donut | Page 1 Tab 1, PDF Page 2 |
-| `plot_normal_curve(full_data, reg_data, title, is_grade_scale)` | Histogram + bell curve overlay | Page 1 Tab 3, PDF Pages 3+ |
+| `plot_normal_curve(full_data, reg_data, title, is_grade_scale)` | Histogram + bell curve + separate grade-split donut figure | Page 1 Tab 3, PDF Pages 3+ |
 | `plot_z_score_distribution(z_df, title)` | Histogram of z-scores with σ reference lines | (available, not currently shown in a tab) |
 | `plot_semester_metric_bars(comparison_df, metric, ...)` | Single-metric grouped bar chart | (available, not used in current flow — superseded by `plot_grouped_multi_metric_bars`) |
 | `plot_grouped_multi_metric_bars(comparison_df, metrics, groups, title)` | Seaborn grouped bar chart, one cluster per group | Page 4 |
@@ -293,7 +293,7 @@ Small helpers for Streamlit UI chrome.
 
 | Function | What it does |
 |----------|-------------|
-| `render_sidebar_branding()` | Shows the college logo, name, and "Designed by Nirjhar Debnath" credit in the sidebar.  Call once at the top of every page |
+| `render_sidebar_branding()` | Shows the college logo and name at the top of the sidebar and keeps the "Designed by Nirjhar Debnath" credit pinned to the bottom |
 | `render_footer()` | Adds a `---` divider at the bottom of a page |
 | `downloadable_plot(fig, filename)` | Renders a figure with `st.pyplot` and adds a PNG download button directly below it |
 | `download_table_button(df, label, filename)` | Renders a CSV download button for a DataFrame |

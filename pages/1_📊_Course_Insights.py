@@ -20,6 +20,7 @@ from utils.pdf_generator import create_master_report_pdf
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
 
 THEME = SOFT_COLORS
+CURVE_PIE_COLUMN_RATIO = [1, 1.2]
 
 st.markdown(f"""
     <style>
@@ -254,7 +255,7 @@ if data:
 
     with tab2:
         st.subheader("Consolidated Result Matrix")
-        st.caption("Subject-wise statistics: mean score, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F).")
+        st.caption("Subject-wise statistics table includes mean, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F). Visual comparison charts use mean, median, standard deviation, and pass percentage.")
         if not stats_df.empty:
             st.divider()
             st.dataframe(stats_df, width='stretch', hide_index=True)
@@ -308,7 +309,7 @@ if data:
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
                 gpa_curve_fig, gpa_pie_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
-                gpa_curve_col, gpa_pie_col = st.columns([1, 1.2])
+                gpa_curve_col, gpa_pie_col = st.columns(CURVE_PIE_COLUMN_RATIO)
                 with gpa_curve_col:
                     st.pyplot(gpa_curve_fig, width='stretch')
                 with gpa_pie_col:
@@ -338,7 +339,7 @@ if data:
                     title=f"{format_subject(selected_subj)} Distribution",
                     is_grade_scale=True,
                 )
-                subj_curve_col, subj_pie_col = st.columns([1, 1.2])
+                subj_curve_col, subj_pie_col = st.columns(CURVE_PIE_COLUMN_RATIO)
                 with subj_curve_col:
                     st.pyplot(subject_curve_fig, width='stretch')
                 with subj_pie_col:

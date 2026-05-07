@@ -52,6 +52,7 @@ GRADE_COLORS = {
 
 
 def _subject_code_label(subject_label: str) -> str:
+    """Extract the short subject code from a 'CODE - Subject Name' label."""
     return str(subject_label).split(" - ", 1)[0].strip()
 
 
@@ -368,6 +369,7 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
 
 
 def _plot_grade_split_pie(full_clean: pd.Series, title: str = "Grade Split (O/E/A/B/C/D/F)"):
+    """Render a donut-style grade split pie chart from numeric grade-point values."""
     fig, ax_grade = plt.subplots(figsize=(6.8, 5.8))
     fig.patch.set_facecolor(BG_COLOR)
     ax_grade.set_facecolor(BG_COLOR)
@@ -408,6 +410,7 @@ def _plot_grade_split_pie(full_clean: pd.Series, title: str = "Grade Split (O/E/
 
 def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
                       title: str = "Distribution", is_grade_scale: bool = False) -> Tuple[plt.Figure, Optional[plt.Figure]]:
+    """Return the distribution curve figure and an optional grade-split donut figure."""
     fig, ax = plt.subplots(figsize=(9.5, 5.2))
     fig.patch.set_facecolor(BG_COLOR)
     ax.set_facecolor(BG_COLOR)
@@ -536,6 +539,16 @@ def plot_subject_metric_comparison_bars(
     selected_metric: Optional[str] = None,
     use_subject_codes: bool = True,
 ):
+    def _parse_metric_values(metric_series: pd.Series, metric_name: str) -> pd.Series:
+        if metric_name == "Pass %":
+            metric_series = (
+                metric_series
+                .astype(str)
+                .str.replace("%", "", regex=False)
+                .str.strip()
+            )
+        return pd.to_numeric(metric_series, errors="coerce")
+
     metric_cols = ["Mean", "Median", "Std Dev (σ)", "Pass %"]
     available_metrics = [m for m in metric_cols if m in stats_df.columns]
     if stats_df.empty or not available_metrics:
@@ -568,14 +581,7 @@ def plot_subject_metric_comparison_bars(
         ax = axes[i]
         ax.set_facecolor(BG_COLOR)
         metric_df = stats_df[["Subject", metric]].copy()
-        if metric == "Pass %":
-            metric_df[metric] = (
-                metric_df[metric]
-                .astype(str)
-                .str.replace("%", "", regex=False)
-                .str.strip()
-            )
-        metric_df[metric] = pd.to_numeric(metric_df[metric], errors="coerce")
+        metric_df[metric] = _parse_metric_values(metric_df[metric], metric)
         metric_df = metric_df.dropna(subset=[metric]).sort_values(metric, ascending=False)
         if metric_df.empty:
             ax.text(0.5, 0.5, f"No data for {metric}", ha="center", va="center")
