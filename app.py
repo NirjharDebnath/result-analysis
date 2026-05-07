@@ -6,6 +6,7 @@ from utils.processor import read_uploaded_datasets, validate_dataset, get_sample
 from utils.subjects import (
     SUBJECT_CODE_COLUMN,
     SUBJECT_NAME_COLUMN,
+    SUBJECT_MAPPING_STATE_KEY,
     format_subject_label,
     get_subject_mapping,
     subject_mapping_from_dataframe,
@@ -266,7 +267,7 @@ edited_subject_mapping_df = st.data_editor(
 
 updated_subject_mapping = subject_mapping_from_dataframe(edited_subject_mapping_df)
 if updated_subject_mapping != subject_mapping:
-    st.session_state["subject_mapping"] = updated_subject_mapping
+    st.session_state[SUBJECT_MAPPING_STATE_KEY] = updated_subject_mapping
     st.rerun()
 
 st.caption(f"{len(updated_subject_mapping)} subject mappings available in the current session.")

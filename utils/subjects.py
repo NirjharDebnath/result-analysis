@@ -94,7 +94,6 @@ def normalize_subject_mapping(mapping: Optional[Dict[object, object]]) -> Dict[s
 
 
 DEFAULT_SUBJECTS = normalize_subject_mapping(subjects)
-subjects = DEFAULT_SUBJECTS.copy()
 
 
 def get_subject_mapping() -> Dict[str, str]:
@@ -104,7 +103,8 @@ def get_subject_mapping() -> Dict[str, str]:
         if isinstance(current_mapping, dict)
         else DEFAULT_SUBJECTS.copy()
     )
-    st.session_state[SUBJECT_MAPPING_STATE_KEY] = normalized_mapping.copy()
+    if current_mapping != normalized_mapping:
+        st.session_state[SUBJECT_MAPPING_STATE_KEY] = normalized_mapping.copy()
     return normalized_mapping
 
 
