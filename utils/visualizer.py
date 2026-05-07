@@ -39,13 +39,31 @@ def resolve_logo_path() -> Optional[str]:
     return None
 
 def render_sidebar_branding():
+    st.sidebar.markdown(
+        """
+        <style>
+            div[data-testid="stSidebarUserContent"] {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .sidebar-author-credit {
+                margin-top: auto;
+                padding-top: 1rem;
+                font-size: 0.85rem;
+                opacity: 0.85;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     logo_path = resolve_logo_path()
     if logo_path:
         st.sidebar.image(logo_path, width=120)
     st.sidebar.markdown("**Kalyani Government Engineering College**")
     st.sidebar.markdown("---")
     st.sidebar.caption("🎓 Result Analysis Tool")
-    st.sidebar.caption("Designed by **Nirjhar Debnath**, Dept of CSE, KGEC")
+    st.sidebar.markdown("<div class='sidebar-author-credit'>Designed by <b>Nirjhar Debnath</b>, Dept of CSE, KGEC</div>", unsafe_allow_html=True)
 
 def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, rotate_x: int = 0):
     ax.set_facecolor(SOFT_COLORS["bg"])

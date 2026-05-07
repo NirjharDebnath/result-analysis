@@ -191,12 +191,7 @@ if data:
         total_graded = stats_df[['O', 'E', 'A', 'B', 'C', 'D', 'F']].sum(axis=1)
         passed = total_graded - stats_df['F']
         pass_pct = (passed / total_graded * 100).fillna(0).map(lambda x: f"{x:.1f}%")
-        
-        if "Skewness" in stats_df.columns:
-            loc = stats_df.columns.get_loc("Skewness") + 1
-            stats_df.insert(loc, "Pass %", pass_pct)
-        else:
-            stats_df["Pass %"] = pass_pct
+        stats_df["Pass %"] = pass_pct
 
     if not stats_df.empty and "Subject" in stats_df.columns:
         stats_df["Subject"] = stats_df["Subject"].apply(format_subject)
@@ -259,7 +254,7 @@ if data:
 
     with tab2:
         st.subheader("Consolidated Result Matrix")
-        st.caption("Subject-wise statistics: mean score, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F). Higher skewness means more students scored below average — a harder paper.")
+        st.caption("Subject-wise statistics: mean score, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F).")
         if not stats_df.empty:
             st.divider()
             st.dataframe(stats_df, width='stretch', hide_index=True)
@@ -269,13 +264,31 @@ if data:
                 if highest_skew > 0.5: 
                     st.warning(f"⚠️ **Anomaly Detected:** The subject **{hardest_subject}** has the highest positive skewness ({highest_skew}). This indicates a difficult paper where the majority scored below average.")
             st.divider()
-            st.markdown("#### 📊 Subject Grade Distribution Bars")
-            st.space("medium")
-            subject_grade_bars_fig = plot_subject_grade_distribution_bars(stats_df)
-            st.pyplot(subject_grade_bars_fig, width="stretch")
-            st.markdown("#### 📈 Comparative Subject Metrics")
-            subject_metric_comp_fig = plot_subject_metric_comparison_bars(stats_df)
-            st.pyplot(subject_metric_comp_fig, width="stretch")
+            stat_left, stat_right = st.columns(2)
+            with stat_left:
+                st.markdown("#### 📊 Per-Subject Grade Distribution")
+                grade_subject_options = stats_df["Subject"].astype(str).tolist()
+                selected_grade_subject = st.selectbox(
+                    "Select Subject for Grade Distribution",
+                    grade_subject_options,
+                    key="stat_grade_subject_select",
+                )
+                subject_grade_bars_fig = plot_subject_grade_distribution_bars(stats_df, selected_subject=selected_grade_subject)
+                st.pyplot(subject_grade_bars_fig, width="stretch")
+            with stat_right:
+                st.markdown("#### 📈 Comparative Metrics by Subject Code")
+                metric_options = [m for m in ["Mean", "Median", "Std Dev (σ)", "Pass %"] if m in stats_df.columns]
+                selected_metric = st.selectbox(
+                    "Select Metric",
+                    metric_options,
+                    key="stat_metric_select",
+                )
+                subject_metric_comp_fig = plot_subject_metric_comparison_bars(
+                    stats_df,
+                    selected_metric=selected_metric,
+                    use_subject_codes=True,
+                )
+                st.pyplot(subject_metric_comp_fig, width="stretch")
 
     with tab3:
         st.subheader("Statistical Bell Curves")
@@ -294,8 +307,13 @@ if data:
                 selected_gpa = st.selectbox("Select GPA Metric", valid_gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
-                gpa_curve_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
-                st.pyplot(gpa_curve_fig, width='stretch')
+                gpa_curve_fig, gpa_pie_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
+                gpa_curve_col, gpa_pie_col = st.columns([1, 1.2])
+                with gpa_curve_col:
+                    st.pyplot(gpa_curve_fig, width='stretch')
+                with gpa_pie_col:
+                    if gpa_pie_fig is not None:
+                        st.pyplot(gpa_pie_fig, width='stretch')
 
         with col_subj:
             if valid_subjects:
@@ -314,13 +332,18 @@ if data:
                 else:
                     reg_subj = None
 
-                subject_curve_fig = plot_normal_curve(
+                subject_curve_fig, subject_pie_fig = plot_normal_curve(
                     full_subj,
                     reg_subj,
                     title=f"{format_subject(selected_subj)} Distribution",
                     is_grade_scale=True,
                 )
-                st.pyplot(subject_curve_fig, width='stretch')
+                subj_curve_col, subj_pie_col = st.columns([1, 1.2])
+                with subj_curve_col:
+                    st.pyplot(subject_curve_fig, width='stretch')
+                with subj_pie_col:
+                    if subject_pie_fig is not None:
+                        st.pyplot(subject_pie_fig, width='stretch')
 
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
@@ -385,23 +408,39 @@ if data:
                         else:
                             reg_subj_num = None
 
-                        fig = plot_normal_curve(
+                        curve_fig, pie_fig = plot_normal_curve(
                             full_subj_num,
                             reg_subj_num,
                             title=f"{format_subject(subj)} Distribution",
                             is_grade_scale=True,
                         )
-                        if fig is not None:
-                            all_subject_figs.append(fig)
+                        if curve_fig is not None:
+                            all_subject_figs.append((curve_fig, pie_fig))
 
                     # Generate bell curves for all valid GPA columns
                     all_gpa_figs = []
                     for gpa_col in valid_gpa_cols:
                         full_gpa_data = pd.to_numeric(filtered_df[gpa_col], errors='coerce')
                         reg_gpa_data = pd.to_numeric(filtered_df[current_class_mask][gpa_col], errors='coerce') if not exclude_old_batch_state else None
-                        gpa_fig = plot_normal_curve(full_gpa_data, reg_gpa_data, title=f"{gpa_col} Curve", is_grade_scale=False)
-                        if gpa_fig is not None:
-                            all_gpa_figs.append(gpa_fig)
+                        gpa_curve, gpa_pie = plot_normal_curve(full_gpa_data, reg_gpa_data, title=f"{gpa_col} Curve", is_grade_scale=False)
+                        if gpa_curve is not None:
+                            all_gpa_figs.append((gpa_curve, gpa_pie))
+
+                    all_stat_grade_figs = []
+                    all_stat_metric_figs = []
+                    if include_stat_visuals and not stats_df.empty:
+                        for subject_name in stats_df["Subject"].astype(str).tolist():
+                            all_stat_grade_figs.append(
+                                plot_subject_grade_distribution_bars(stats_df, selected_subject=subject_name)
+                            )
+                        for metric_name in [m for m in ["Mean", "Median", "Std Dev (σ)", "Pass %"] if m in stats_df.columns]:
+                            all_stat_metric_figs.append(
+                                plot_subject_metric_comparison_bars(
+                                    stats_df,
+                                    selected_metric=metric_name,
+                                    use_subject_codes=True,
+                                )
+                            )
 
                     summary = {
                         "Total Evaluated": len(filtered_df),
@@ -447,13 +486,21 @@ if data:
                         overview_fig=overview_fig,
                         batch_overview_data=batch_overview_data,
                         logo_path=logo_path,
-                        stat_grade_fig=subject_grade_bars_fig if include_stat_visuals else None,
-                        stat_metric_fig=subject_metric_comp_fig if include_stat_visuals else None,
+                        stat_grade_figs=all_stat_grade_figs if include_stat_visuals else None,
+                        stat_metric_figs=all_stat_metric_figs if include_stat_visuals else None,
                     )
                     
-                    for fig in all_subject_figs:
+                    for curve_fig, pie_fig in all_subject_figs:
+                        plt.close(curve_fig)
+                        if pie_fig is not None:
+                            plt.close(pie_fig)
+                    for curve_fig, pie_fig in all_gpa_figs:
+                        plt.close(curve_fig)
+                        if pie_fig is not None:
+                            plt.close(pie_fig)
+                    for fig in all_stat_grade_figs:
                         plt.close(fig)
-                    for fig in all_gpa_figs:
+                    for fig in all_stat_metric_figs:
                         plt.close(fig)
                     if subject_grade_bars_fig is not None:
                         plt.close(subject_grade_bars_fig)
