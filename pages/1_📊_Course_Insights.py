@@ -10,6 +10,8 @@ from utils.analytics import get_class_masks, determine_student_status, calculate
 from utils.charts import (
     plot_status_bars,
     plot_normal_curve,
+    plot_gpa_bucket_distribution,
+    plot_normal_distribution_stats,
     plot_z_score_distribution,
     plot_executive_overview,
     plot_subject_grade_distribution_bars,
@@ -20,7 +22,6 @@ from utils.pdf_generator import create_master_report_pdf
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
 
 THEME = SOFT_COLORS
-CURVE_PIE_COLUMN_RATIO = [1, 1.2]
 
 st.markdown(f"""
     <style>
@@ -293,7 +294,7 @@ if data:
 
     with tab3:
         st.subheader("Statistical Bell Curves")
-        st.caption("Select a GPA metric or subject to view its score distribution. The histogram shows how scores are spread; the curve overlays the theoretical normal (bell) distribution. Use this to spot subjects where most students did poorly (left-skewed bell) or exceptionally well.")
+        st.caption("GPA metrics show bucket-wise student counts first, followed by a separate normal-distribution analysis with mean, standard deviation, and σ-region coverage. Subject distributions keep the histogram+curve view with the grade split pie chart shown below.")
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
 
@@ -308,13 +309,14 @@ if data:
                 selected_gpa = st.selectbox("Select GPA Metric", valid_gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
-                gpa_curve_fig, gpa_pie_fig = plot_normal_curve(full_gpa, reg_gpa, title=f"{selected_gpa} Curve", is_grade_scale=False)
-                gpa_curve_col, gpa_pie_col = st.columns(CURVE_PIE_COLUMN_RATIO)
-                with gpa_curve_col:
-                    st.pyplot(gpa_curve_fig, width='stretch')
-                with gpa_pie_col:
-                    if gpa_pie_fig is not None:
-                        st.pyplot(gpa_pie_fig, width='stretch')
+                gpa_bucket_fig = plot_gpa_bucket_distribution(full_gpa, title=f"{selected_gpa} Bucket Distribution")
+                gpa_curve_fig = plot_normal_distribution_stats(
+                    reg_gpa if reg_gpa is not None else full_gpa,
+                    title=f"{selected_gpa} Normal Distribution Stats",
+                    is_grade_scale=False,
+                )
+                st.pyplot(gpa_bucket_fig, width='stretch')
+                st.pyplot(gpa_curve_fig, width='stretch')
 
         with col_subj:
             if valid_subjects:
@@ -339,12 +341,9 @@ if data:
                     title=f"{format_subject(selected_subj)} Distribution",
                     is_grade_scale=True,
                 )
-                subj_curve_col, subj_pie_col = st.columns(CURVE_PIE_COLUMN_RATIO)
-                with subj_curve_col:
-                    st.pyplot(subject_curve_fig, width='stretch')
-                with subj_pie_col:
-                    if subject_pie_fig is not None:
-                        st.pyplot(subject_pie_fig, width='stretch')
+                st.pyplot(subject_curve_fig, width='stretch')
+                if subject_pie_fig is not None:
+                    st.pyplot(subject_pie_fig, width='stretch')
 
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
@@ -423,9 +422,13 @@ if data:
                     for gpa_col in valid_gpa_cols:
                         full_gpa_data = pd.to_numeric(filtered_df[gpa_col], errors='coerce')
                         reg_gpa_data = pd.to_numeric(filtered_df[current_class_mask][gpa_col], errors='coerce') if not exclude_old_batch_state else None
-                        gpa_curve, gpa_pie = plot_normal_curve(full_gpa_data, reg_gpa_data, title=f"{gpa_col} Curve", is_grade_scale=False)
-                        if gpa_curve is not None:
-                            all_gpa_figs.append((gpa_curve, gpa_pie))
+                        gpa_buckets = plot_gpa_bucket_distribution(full_gpa_data, title=f"{gpa_col} Bucket Distribution")
+                        gpa_curve = plot_normal_distribution_stats(
+                            reg_gpa_data if reg_gpa_data is not None else full_gpa_data,
+                            title=f"{gpa_col} Normal Distribution Stats",
+                            is_grade_scale=False,
+                        )
+                        all_gpa_figs.append((gpa_buckets, gpa_curve))
 
                     all_stat_grade_figs = []
                     all_stat_metric_figs = []
@@ -495,10 +498,10 @@ if data:
                         plt.close(curve_fig)
                         if pie_fig is not None:
                             plt.close(pie_fig)
-                    for curve_fig, pie_fig in all_gpa_figs:
-                        plt.close(curve_fig)
-                        if pie_fig is not None:
-                            plt.close(pie_fig)
+                    for bucket_fig, curve_fig in all_gpa_figs:
+                        plt.close(bucket_fig)
+                        if curve_fig is not None:
+                            plt.close(curve_fig)
                     for fig in all_stat_grade_figs:
                         plt.close(fig)
                     for fig in all_stat_metric_figs:

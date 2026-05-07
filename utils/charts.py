@@ -460,8 +460,118 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
     ax.grid(alpha=0.2)
     plt.tight_layout()
 
-    pie_fig = _plot_grade_split_pie(full_clean)
+    pie_fig = _plot_grade_split_pie(full_clean) if is_grade_scale else None
     return fig, pie_fig
+
+
+def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket Distribution (0-10)"):
+    fig, ax = plt.subplots(figsize=(9.5, 4.8))
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
+    clean = pd.to_numeric(full_data, errors="coerce").dropna()
+    if clean.empty:
+        ax.text(0.5, 0.5, "No GPA data available", ha="center", va="center", fontsize=12)
+        ax.axis("off")
+        return fig
+
+    bucket_ids = np.floor(np.clip(clean, 0, 9.999)).astype(int)
+    counts = bucket_ids.value_counts().reindex(range(10), fill_value=0)
+    labels = [f"{i}-{i+1}" for i in range(10)]
+
+    bars = ax.bar(labels, counts.values, color=ACCENT_COLOR, edgecolor="black", alpha=0.85)
+    for bar, count in zip(bars, counts.values):
+        ax.annotate(
+            str(int(count)),
+            (bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    ax.set_title(title, fontsize=14, pad=12)
+    ax.set_xlabel("GPA Range")
+    ax.set_ylabel("Students")
+    ax.grid(axis="y", linestyle="--", alpha=0.25)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.tight_layout()
+    return fig
+
+
+def plot_normal_distribution_stats(
+    full_data: pd.Series,
+    title: str = "Normal Distribution Analysis",
+    is_grade_scale: bool = False,
+):
+    fig, ax = plt.subplots(figsize=(9.5, 5.2))
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
+    clean = pd.to_numeric(full_data, errors="coerce").dropna()
+    if clean.empty or clean.std() == 0:
+        ax.text(0.5, 0.5, "Not enough variance for distribution analysis", ha="center", va="center", fontsize=12)
+        ax.axis("off")
+        return fig
+
+    mean = clean.mean()
+    std = clean.std()
+
+    if is_grade_scale:
+        xmin, xmax = -1, 11
+    else:
+        span = max(3 * std, 0.5)
+        xmin = max(0, mean - span)
+        xmax = min(10, mean + span)
+        if xmax - xmin < 1:
+            xmin = max(0, mean - 0.5)
+            xmax = min(10, mean + 0.5)
+
+    x = np.linspace(xmin, xmax, 400)
+    p = norm.pdf(x, mean, std)
+
+    ax.plot(x, p, color="black", linewidth=2.2, label="Normal Curve")
+    ax.fill_between(x, 0, p, where=(x >= mean - std) & (x <= mean + std), color=PASS_COLOR, alpha=0.18, label="±1σ region")
+    ax.fill_between(x, 0, p, where=((x >= mean - 2 * std) & (x < mean - std)) | ((x > mean + std) & (x <= mean + 2 * std)),
+                    color=ACCENT_COLOR, alpha=0.12, label="1σ to 2σ region")
+
+    ax.axvline(mean, color=PRIMARY_COLOR, linestyle="--", linewidth=2)
+    ax.axvline(mean - std, color=BACKLOG_COLOR, linestyle=":", linewidth=2)
+    ax.axvline(mean + std, color=ACCENT_COLOR, linestyle=":", linewidth=2)
+    ax.axvline(mean - 2 * std, color=GRID_COLOR, linestyle=":", linewidth=1.5)
+    ax.axvline(mean + 2 * std, color=GRID_COLOR, linestyle=":", linewidth=1.5)
+
+    within_1 = ((clean >= (mean - std)) & (clean <= (mean + std))).mean() * 100
+    within_2 = ((clean >= (mean - 2 * std)) & (clean <= (mean + 2 * std))).mean() * 100
+    below_1 = (clean < (mean - std)).mean() * 100
+    above_1 = (clean > (mean + std)).mean() * 100
+
+    summary_text = (
+        f"μ = {mean:.2f}, σ = {std:.2f}\n"
+        f"Within ±1σ: {within_1:.1f}%\n"
+        f"Within ±2σ: {within_2:.1f}%\n"
+        f"Below μ-σ: {below_1:.1f}% | Above μ+σ: {above_1:.1f}%"
+    )
+    ax.text(
+        0.02,
+        0.97,
+        summary_text,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=10,
+        bbox=dict(boxstyle="round,pad=0.35", facecolor="white", alpha=0.85, edgecolor=GRID_COLOR),
+    )
+
+    ax.set_title(title, fontsize=14, pad=12)
+    ax.set_xlabel("Values")
+    ax.set_ylabel("Density")
+    ax.grid(alpha=0.2)
+    ax.legend(loc="upper right")
+    plt.tight_layout()
+    return fig
 
 
 def plot_subject_grade_distribution_bars(stats_df: pd.DataFrame, selected_subject: Optional[str] = None):

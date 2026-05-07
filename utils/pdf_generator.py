@@ -163,23 +163,30 @@ def create_master_report_pdf(
                     tmp_files_to_clean.append(tmp.name)
                 pdf.ln(3)
 
-    def _draw_curve_pair(curve_fig, pie_fig):
-        """Render a curve figure and optional pie figure side-by-side on the current PDF page."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_curve:
-            curve_fig.savefig(tmp_curve.name, format="png", bbox_inches="tight", dpi=150)
-            y_start = pdf.get_y()
-            pdf.image(tmp_curve.name, x=8, y=y_start, w=118)
-            tmp_files_to_clean.append(tmp_curve.name)
-        if pie_fig is not None:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_pie:
-                pie_fig.savefig(tmp_pie.name, format="png", bbox_inches="tight", dpi=150)
-                pdf.image(tmp_pie.name, x=130, y=y_start, w=74)
-                tmp_files_to_clean.append(tmp_pie.name)
-            row_height = 85
+    def _draw_vertical_pair(top_fig, bottom_fig=None, top_width=152, bottom_width=110):
+        """Render one figure on top and optional second figure below it."""
+        top_height_est = 88
+        bottom_height_est = 82 if bottom_fig is not None else 0
+        required = top_height_est + (bottom_height_est + 8 if bottom_fig is not None else 0)
+        if pdf.get_y() + required > 280:
+            pdf.add_page()
+
+        y_start = pdf.get_y()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_top:
+            top_fig.savefig(tmp_top.name, format="png", bbox_inches="tight", dpi=150)
+            pdf.image(tmp_top.name, x=(210 - top_width) / 2, y=y_start, w=top_width)
+            tmp_files_to_clean.append(tmp_top.name)
+
+        y_after_top = y_start + top_height_est
+        if bottom_fig is not None:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_bottom:
+                bottom_fig.savefig(tmp_bottom.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + 4, w=bottom_width)
+                tmp_files_to_clean.append(tmp_bottom.name)
+            pdf.set_y(y_after_top + bottom_height_est + 10)
         else:
-            row_height = 78
-        pdf.set_y(y_start + row_height)
-        pdf.ln(4)
+            pdf.set_y(y_after_top + 6)
+        pdf.ln(2)
 
     # --- Pages 4+: GPA Distribution Curves ---
     if gpa_curve_figs:
@@ -188,18 +195,16 @@ def create_master_report_pdf(
         pdf.cell(190, 10, "GPA Distribution Curves", ln=True)
         pdf.ln(5)
 
-        for i, figure_entry in enumerate(gpa_curve_figs):
+        for figure_entry in gpa_curve_figs:
             if isinstance(figure_entry, (list, tuple)):
-                curve_fig = figure_entry[0] if len(figure_entry) > 0 else None
-                pie_fig = figure_entry[1] if len(figure_entry) > 1 else None
+                top_fig = figure_entry[0] if len(figure_entry) > 0 else None
+                bottom_fig = figure_entry[1] if len(figure_entry) > 1 else None
             else:
-                curve_fig = figure_entry
-                pie_fig = None
-            if curve_fig is None:
+                top_fig = figure_entry
+                bottom_fig = None
+            if top_fig is None:
                 continue
-            if i > 0 and pdf.get_y() > 180:
-                pdf.add_page()
-            _draw_curve_pair(curve_fig, pie_fig)
+            _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=152)
 
     # --- Pages 4+: All Subject Curves (Stacked 2 per page) ---
     if subject_curve_figs:
@@ -208,18 +213,16 @@ def create_master_report_pdf(
         pdf.cell(190, 10, "Subject Distribution Curves", ln=True)
         pdf.ln(5)
         
-        for i, figure_entry in enumerate(subject_curve_figs):
+        for figure_entry in subject_curve_figs:
             if isinstance(figure_entry, (list, tuple)):
-                curve_fig = figure_entry[0] if len(figure_entry) > 0 else None
-                pie_fig = figure_entry[1] if len(figure_entry) > 1 else None
+                top_fig = figure_entry[0] if len(figure_entry) > 0 else None
+                bottom_fig = figure_entry[1] if len(figure_entry) > 1 else None
             else:
-                curve_fig = figure_entry
-                pie_fig = None
-            if curve_fig is None:
+                top_fig = figure_entry
+                bottom_fig = None
+            if top_fig is None:
                 continue
-            if i > 0 and pdf.get_y() > 180: 
-                pdf.add_page()
-            _draw_curve_pair(curve_fig, pie_fig)
+            _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=110)
 
     # --- Z-Score Table ---
     if not z_score_df.empty:
