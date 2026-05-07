@@ -74,7 +74,7 @@ subjects = {
 SUBJECT_MAPPING_STATE_KEY = "subject_mapping"
 SUBJECT_CODE_COLUMN = "Subject Code"
 SUBJECT_NAME_COLUMN = "Subject Name"
-_DUPLICATE_SUFFIX_PATTERN = re.compile(r"^(.*?)(\s*\(\d+\))?$")
+_DUPLICATE_NUMBER_SUFFIX_PATTERN = re.compile(r"^(.*?)(\s*\(\d+\))?$")
 
 
 def normalize_subject_code(code: object) -> str:
@@ -122,7 +122,7 @@ def subject_mapping_from_dataframe(df: Optional[pd.DataFrame]) -> Dict[str, str]
         return {}
 
     mapping: Dict[str, str] = {}
-    for _, row in df.iterrows():
+    for row in df.to_dict("records"):
         code = normalize_subject_code(row.get(SUBJECT_CODE_COLUMN))
         name = str(row.get(SUBJECT_NAME_COLUMN, "")).strip()
         if code and name:
@@ -135,7 +135,7 @@ def format_subject_label(subject_code: object, mapping: Optional[Dict[object, ob
     if not raw_subject:
         return raw_subject
 
-    match = _DUPLICATE_SUFFIX_PATTERN.match(raw_subject)
+    match = _DUPLICATE_NUMBER_SUFFIX_PATTERN.match(raw_subject)
     base_code = match.group(1).strip() if match else raw_subject
     suffix = match.group(2) or ""
 
@@ -145,3 +145,7 @@ def format_subject_label(subject_code: object, mapping: Optional[Dict[object, ob
         return raw_subject
 
     return f"{base_code}{suffix} - {subject_name}"
+
+
+def subject_label_formatter(mapping: Optional[Dict[object, object]] = None):
+    return lambda subject_code: format_subject_label(subject_code, mapping)

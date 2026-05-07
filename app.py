@@ -7,8 +7,8 @@ from utils.subjects import (
     SUBJECT_CODE_COLUMN,
     SUBJECT_NAME_COLUMN,
     SUBJECT_MAPPING_STATE_KEY,
-    format_subject_label,
     get_subject_mapping,
+    subject_label_formatter,
     subject_mapping_from_dataframe,
     subject_mapping_to_dataframe,
 )
@@ -132,6 +132,7 @@ st.markdown(f"""
 
 render_sidebar_branding()
 subject_mapping = get_subject_mapping()
+format_subject = subject_label_formatter(subject_mapping)
 
 st.header(COLLEGE_NAME)
 st.title("📁 Upload Your Result Dataset")
@@ -241,7 +242,7 @@ if uploaded_files:
             with col2:
                 st.subheader("Subject Columns")
                 st.caption("These columns contain subject-wise grades or marks.")
-                st.write([format_subject_label(col, subject_mapping) for col in subject_cols])
+                st.write([format_subject(col) for col in subject_cols])
                 
     except Exception as exc:
         st.error(f"Unable to read uploaded file. Details: {exc}")

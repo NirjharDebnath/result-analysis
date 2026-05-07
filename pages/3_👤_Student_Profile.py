@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME, PASSING_GRADES, SOFT_COLORS, UI_THEME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
-from utils.subjects import format_subject_label, get_subject_mapping
+from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Student Profile", page_icon="👤", layout="wide")
@@ -131,6 +131,7 @@ data = require_data()
 if data:
     df, all_subject_cols = data
     subject_mapping = get_subject_mapping()
+    format_subject = subject_label_formatter(subject_mapping)
     course_df = apply_course_stream_filters(df, "Select Course", "student_course")
 
     student_options = (
@@ -183,7 +184,7 @@ if data:
                 status = "Unknown"
 
             subject_rows.append({
-                "SUBJECT": format_subject_label(subject, subject_mapping),
+                "SUBJECT": format_subject(subject),
                 "GRADE": grade if grade else "N/A",
                 "STATUS": status
             })
