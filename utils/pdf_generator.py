@@ -36,6 +36,8 @@ def create_master_report_pdf(
     TOP_FIG_HEIGHT_EST = 88  # Approximate height for full-width tab-3 chart exports.
     BOTTOM_FIG_HEIGHT_EST = 82  # Approximate height for secondary stacked charts.
     STACK_VERTICAL_GAP = 8
+    TOP_TO_BOTTOM_OFFSET = 4
+    SINGLE_CHART_BOTTOM_PADDING = 6
 
     # --- Page 1: Header + Batch Overview Graph ---
     pdf.add_page()
@@ -185,11 +187,11 @@ def create_master_report_pdf(
         if bottom_fig is not None:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_bottom:
                 bottom_fig.savefig(tmp_bottom.name, format="png", bbox_inches="tight", dpi=150)
-                pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + 4, w=bottom_width)
+                pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + TOP_TO_BOTTOM_OFFSET, w=bottom_width)
                 tmp_files_to_clean.append(tmp_bottom.name)
             pdf.set_y(y_after_top + bottom_height_est + 10)
         else:
-            pdf.set_y(y_after_top + 6)
+            pdf.set_y(y_after_top + SINGLE_CHART_BOTTOM_PADDING)
         pdf.ln(2)
 
     # --- Pages 4+: GPA Distribution Curves ---

@@ -486,7 +486,7 @@ def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket 
         return fig
 
     bucket_ids = np.floor(np.clip(clean, 0, None)).astype(int)
-    # Keep exact 10.0 values in the terminal "9-10" bucket (index 9).
+    # Keep all values >= 10 in the terminal "9-10" bucket (index 9).
     bucket_ids = np.where(bucket_ids >= 10, 9, bucket_ids)
     counts = bucket_ids.value_counts().reindex(range(10), fill_value=0)
     labels = [f"{i}-{i+1}" for i in range(10)]
