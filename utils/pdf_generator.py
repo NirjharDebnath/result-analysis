@@ -33,8 +33,9 @@ def create_master_report_pdf(
     pdf.set_auto_page_break(auto=True, margin=15)
     tmp_files_to_clean = []
     PAGE_CONTENT_LIMIT_Y = pdf.h - 17  # Keep visual pairs above bottom margin for A4 portrait.
-    TOP_FIG_HEIGHT_EST = 88
-    BOTTOM_FIG_HEIGHT_EST = 82
+    TOP_FIG_HEIGHT_EST = 88  # Approximate height for full-width tab-3 chart exports.
+    BOTTOM_FIG_HEIGHT_EST = 82  # Approximate height for secondary stacked charts.
+    STACK_VERTICAL_GAP = 8
 
     # --- Page 1: Header + Batch Overview Graph ---
     pdf.add_page()
@@ -170,7 +171,7 @@ def create_master_report_pdf(
         """Render one figure on top and optional second figure below it."""
         top_height_est = TOP_FIG_HEIGHT_EST
         bottom_height_est = BOTTOM_FIG_HEIGHT_EST if bottom_fig is not None else 0
-        required = top_height_est + (bottom_height_est + 8 if bottom_fig is not None else 0)
+        required = top_height_est + (bottom_height_est + STACK_VERTICAL_GAP if bottom_fig is not None else 0)
         if pdf.get_y() + required > PAGE_CONTENT_LIMIT_Y:
             pdf.add_page()
 

@@ -58,6 +58,7 @@ NORMAL_SPAN_MULTIPLIER = 3
 MIN_SPAN = 0.5
 MIN_DISTRIBUTION_RANGE = 1
 HALF_RANGE_PADDING = 0.5
+# Distribution tuning constants for x-axis span control and GPA bucket labeling.
 
 
 def _subject_code_label(subject_label: str) -> str:
@@ -522,13 +523,13 @@ def plot_normal_distribution_stats(
     ax.set_facecolor(BG_COLOR)
 
     clean = pd.to_numeric(full_data, errors="coerce").dropna()
-    if clean.empty or clean.std() == 0:
+    std = clean.std()
+    if clean.empty or std == 0:
         ax.text(0.5, 0.5, "Not enough variance for distribution analysis", ha="center", va="center", fontsize=12)
         ax.axis("off")
         return fig
 
     mean = clean.mean()
-    std = clean.std()
 
     if is_grade_scale:
         xmin, xmax = GRADE_SCALE_MIN, GRADE_SCALE_MAX
