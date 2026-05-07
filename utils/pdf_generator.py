@@ -24,6 +24,8 @@ def create_master_report_pdf(
     overview_fig=None,
     batch_overview_data=None,
     logo_path=None,
+    stat_grade_fig=None,
+    stat_metric_fig=None,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -99,6 +101,34 @@ def create_master_report_pdf(
         pdf.cell(11, 7, clean_text(str(int(row.get("D", 0)))), border=1, align="C")
         pdf.cell(12, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
         pdf.ln()
+
+    if stat_grade_fig is not None or stat_metric_fig is not None:
+        pdf.ln(3)
+        current_y = pdf.get_y()
+        estimated_needed = 120
+        if current_y + estimated_needed > 280:
+            pdf.add_page()
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(190, 8, "Statistical Matrix Visual Summary", ln=True)
+        pdf.set_font("Arial", "", 9)
+        pdf.multi_cell(190, 5, "Subject-wise grade bars and comparative metric charts for quick performance benchmarking.")
+        pdf.ln(2)
+
+        if stat_grade_fig is not None:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                stat_grade_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp.name, x=10, y=None, w=188)
+                tmp_files_to_clean.append(tmp.name)
+            pdf.ln(4)
+
+        if stat_metric_fig is not None:
+            if pdf.get_y() > 130:
+                pdf.add_page()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                stat_metric_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp.name, x=10, y=None, w=188)
+                tmp_files_to_clean.append(tmp.name)
+            pdf.ln(4)
 
     # --- Pages 4+: GPA Distribution Curves ---
     if gpa_curve_figs:

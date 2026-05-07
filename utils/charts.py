@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import norm
 import pandas as pd
 from matplotlib.gridspec import GridSpec
-from typing import Optional, List
+from typing import Optional, List, Dict
 from utils.constants import SOFT_COLORS
 
 # Active theme
@@ -38,6 +38,82 @@ SEASON_PALETTE = [
     GRID_COLOR,
     ACCENT_COLOR,
 ]
+
+GRADE_ORDER = ["O", "E", "A", "B", "C", "D", "F"]
+GRADE_COLORS = {
+    "O": PRIMARY_COLOR,
+    "E": ACCENT_COLOR,
+    "A": PASS_COLOR,
+    "B": "#AFC7B6",
+    "C": BACKLOG_COLOR,
+    "D": LAG_COLOR,
+    "F": FAIL_COLOR,
+}
+
+
+def map_numeric_to_grade(value: float) -> Optional[str]:
+    if pd.isna(value):
+        return None
+    if value >= 9:
+        return "O"
+    if value >= 8:
+        return "E"
+    if value >= 7:
+        return "A"
+    if value >= 6:
+        return "B"
+    if value >= 5:
+        return "C"
+    if value >= 4:
+        return "D"
+    return "F"
+
+
+def _grade_counts_from_numeric(series: pd.Series) -> Dict[str, int]:
+    mapped = series.dropna().apply(map_numeric_to_grade)
+    counts = mapped.value_counts().to_dict()
+    return {grade: int(counts.get(grade, 0)) for grade in GRADE_ORDER}
+
+
+def plot_grade_distribution_donut(grade_counts: Dict[str, int], title: str = "Grade Distribution"):
+    fig, ax = plt.subplots(figsize=(10, 4))
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+
+    counts = [int(grade_counts.get(g, 0)) for g in GRADE_ORDER]
+    total = sum(counts)
+
+    if total == 0:
+        ax.text(0.5, 0.5, "No grade data available", ha="center", va="center", fontsize=11)
+        ax.axis("off")
+        return fig
+
+    colors = [GRADE_COLORS[g] for g in GRADE_ORDER]
+    labels = [f"{g}: {c} ({(c / total * 100):.1f}%)" for g, c in zip(GRADE_ORDER, counts)]
+
+    wedges, _, autotexts = ax.pie(
+        counts,
+        colors=colors,
+        startangle=90,
+        wedgeprops=dict(width=0.45, edgecolor="white"),
+        autopct=lambda p: f"{p:.1f}%" if p > 0 else "",
+        pctdistance=0.75,
+    )
+    for t in autotexts:
+        t.set_fontsize(9)
+        t.set_fontweight("bold")
+
+    ax.legend(
+        wedges,
+        labels,
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False,
+        fontsize=9,
+    )
+    ax.set_title(title, fontweight="bold", fontsize=11)
+    plt.tight_layout()
+    return fig
 
 
 def plot_status_bars(status_counts: pd.Series, total_students: int = None):
@@ -289,15 +365,20 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
 
 def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
                       title: str = "Distribution", is_grade_scale: bool = False):
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 9))
+    gs = GridSpec(2, 1, figure=fig, height_ratios=[3.2, 2], hspace=0.35)
+    ax = fig.add_subplot(gs[0, 0])
+    ax_grade = fig.add_subplot(gs[1, 0])
     fig.patch.set_facecolor(BG_COLOR)
     ax.set_facecolor(BG_COLOR)
+    ax_grade.set_facecolor(BG_COLOR)
 
     full_clean = full_data.dropna()
 
     if full_clean.empty or full_clean.std() == 0:
         ax.text(0.5, 0.5, "Not enough variance for curve",
                 ha='center', va='center', fontsize=14)
+        ax_grade.axis("off")
         return fig
 
     bins = [-0.5, 0.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5] if is_grade_scale else 15
@@ -374,6 +455,122 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
     ax.legend(loc="upper right")
     ax.grid(alpha=0.2)
 
+    grade_counts = _grade_counts_from_numeric(full_clean)
+    grade_values = [grade_counts[g] for g in GRADE_ORDER]
+    total_grades = sum(grade_values)
+    if total_grades == 0:
+        ax_grade.text(0.5, 0.5, "No grade distribution available", ha="center", va="center")
+        ax_grade.axis("off")
+    else:
+        donut_colors = [GRADE_COLORS[g] for g in GRADE_ORDER]
+        grade_labels = [f"{g}: {c} ({(c / total_grades * 100):.1f}%)" for g, c in zip(GRADE_ORDER, grade_values)]
+        wedges, _, autotexts = ax_grade.pie(
+            grade_values,
+            colors=donut_colors,
+            startangle=90,
+            wedgeprops=dict(width=0.45, edgecolor="white"),
+            autopct=lambda p: f"{p:.1f}%" if p > 0 else "",
+            pctdistance=0.75,
+        )
+        for at in autotexts:
+            at.set_fontsize(9)
+            at.set_fontweight("bold")
+        ax_grade.legend(
+            wedges,
+            grade_labels,
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
+            frameon=False,
+            fontsize=9,
+        )
+        ax_grade.set_title("Grade Split (O/E/A/B/C/D/F)", fontsize=11, fontweight="bold")
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_subject_grade_distribution_bars(stats_df: pd.DataFrame):
+    if stats_df.empty:
+        fig, ax = plt.subplots(figsize=(10, 4))
+        fig.patch.set_facecolor(BG_COLOR)
+        ax.set_facecolor(BG_COLOR)
+        ax.text(0.5, 0.5, "No statistics available", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    subject_count = len(stats_df)
+    n_cols = 2
+    n_rows = int(np.ceil(subject_count / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, max(4.8 * n_rows, 5.5)))
+    fig.patch.set_facecolor(BG_COLOR)
+    axes = np.array(axes).reshape(-1)
+
+    for idx, (_, row) in enumerate(stats_df.iterrows()):
+        ax = axes[idx]
+        ax.set_facecolor(BG_COLOR)
+        counts = [int(row.get(g, 0) or 0) for g in GRADE_ORDER]
+        colors = [GRADE_COLORS[g] for g in GRADE_ORDER]
+        bars = ax.bar(GRADE_ORDER, counts, color=colors, edgecolor="black", alpha=0.9)
+        for bar, count in zip(bars, counts):
+            ax.annotate(str(count), (bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                        xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8)
+        ax.set_title(str(row.get("Subject", "Subject")), fontsize=10, fontweight="bold")
+        ax.set_ylabel("Students")
+        ax.grid(axis="y", linestyle="--", alpha=0.25)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    for idx in range(subject_count, len(axes)):
+        axes[idx].axis("off")
+
+    fig.suptitle("Subject-wise Grade Distribution (O/E/A/B/C/D/F)", fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    return fig
+
+
+def plot_subject_metric_comparison_bars(stats_df: pd.DataFrame):
+    metric_cols = ["Mean", "Median", "Std Dev (σ)", "Skewness"]
+    available_metrics = [m for m in metric_cols if m in stats_df.columns]
+    if stats_df.empty or not available_metrics:
+        fig, ax = plt.subplots(figsize=(10, 4))
+        fig.patch.set_facecolor(BG_COLOR)
+        ax.set_facecolor(BG_COLOR)
+        ax.text(0.5, 0.5, "No metric data available", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    fig.patch.set_facecolor(BG_COLOR)
+    axes = axes.flatten()
+
+    for i, metric in enumerate(metric_cols):
+        ax = axes[i]
+        ax.set_facecolor(BG_COLOR)
+        if metric not in stats_df.columns:
+            ax.axis("off")
+            continue
+        metric_df = stats_df[["Subject", metric]].copy()
+        metric_df[metric] = pd.to_numeric(metric_df[metric], errors="coerce")
+        metric_df = metric_df.dropna(subset=[metric]).sort_values(metric, ascending=False)
+        if metric_df.empty:
+            ax.text(0.5, 0.5, f"No data for {metric}", ha="center", va="center")
+            ax.axis("off")
+            continue
+
+        x_labels = metric_df["Subject"].astype(str).tolist()
+        y_vals = metric_df[metric].astype(float).tolist()
+        colors = [SEASON_PALETTE[j % len(SEASON_PALETTE)] for j in range(len(x_labels))]
+        bars = ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.9)
+        for bar, val in zip(bars, y_vals):
+            ax.annotate(f"{val:.2f}", (bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                        xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8, rotation=90)
+        ax.set_title(metric, fontweight="bold")
+        ax.tick_params(axis="x", rotation=35, labelsize=8)
+        ax.grid(axis="y", linestyle="--", alpha=0.25)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    fig.suptitle("Comparative Subject Metrics (Mean, Median, Std Dev, Skewness)", fontsize=13, fontweight="bold")
     plt.tight_layout()
     return fig
 
