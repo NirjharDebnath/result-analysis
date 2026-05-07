@@ -38,6 +38,7 @@ def create_master_report_pdf(
     STACK_VERTICAL_GAP = 8
     TOP_TO_BOTTOM_OFFSET = 4
     SINGLE_CHART_BOTTOM_PADDING = 6
+    STACK_BOTTOM_PADDING = 10
 
     # --- Page 1: Header + Batch Overview Graph ---
     pdf.add_page()
@@ -189,7 +190,7 @@ def create_master_report_pdf(
                 bottom_fig.savefig(tmp_bottom.name, format="png", bbox_inches="tight", dpi=150)
                 pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + TOP_TO_BOTTOM_OFFSET, w=bottom_width)
                 tmp_files_to_clean.append(tmp_bottom.name)
-            pdf.set_y(y_after_top + bottom_height_est + 10)
+            pdf.set_y(y_after_top + bottom_height_est + STACK_BOTTOM_PADDING)
         else:
             pdf.set_y(y_after_top + SINGLE_CHART_BOTTOM_PADDING)
         pdf.ln(2)

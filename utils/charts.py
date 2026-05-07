@@ -50,6 +50,7 @@ GRADE_COLORS = {
     "F": FAIL_COLOR,
 }
 
+# Distribution tuning constants for x-axis span control and GPA bucket labeling.
 GRADE_SCALE_MIN = -1
 GRADE_SCALE_MAX = 11
 GPA_MIN = 0
@@ -58,7 +59,6 @@ NORMAL_SPAN_MULTIPLIER = 3
 MIN_SPAN = 0.5
 MIN_DISTRIBUTION_RANGE = 1
 HALF_RANGE_PADDING = 0.5
-# Distribution tuning constants for x-axis span control and GPA bucket labeling.
 
 
 def _subject_code_label(subject_label: str) -> str:
@@ -485,9 +485,13 @@ def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket 
         ax.axis("off")
         return fig
 
-    bucket_ids = np.floor(np.clip(clean, 0, None)).astype(int)
-    # Keep all values >= 10 in the terminal "9-10" bucket (index 9).
-    bucket_ids = np.where(bucket_ids >= 10, 9, bucket_ids)
+    clean = clean[(clean >= GPA_MIN) & (clean <= GPA_MAX)]
+    if clean.empty:
+        ax.text(0.5, 0.5, "No GPA data available", ha="center", va="center", fontsize=12)
+        ax.axis("off")
+        return fig
+
+    bucket_ids = np.where(clean == GPA_MAX, GPA_MAX - 1, np.floor(clean)).astype(int)
     counts = bucket_ids.value_counts().reindex(range(10), fill_value=0)
     labels = [f"{i}-{i+1}" for i in range(10)]
 
