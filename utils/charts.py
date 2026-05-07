@@ -222,7 +222,7 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
     total_passed = current_passed + reapp_passed
     total_failed = total - total_passed
 
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(12, 8))
     fig.patch.set_facecolor(BG_COLOR)
     gs = GridSpec(2, 6, figure=fig, hspace=0.55, wspace=0.5)
 
@@ -523,7 +523,7 @@ def plot_subject_grade_distribution_bars(stats_df: pd.DataFrame):
     for idx in range(subject_count, len(axes)):
         axes[idx].axis("off")
 
-    fig.suptitle("Subject-wise Grade Distribution (O/E/A/B/C/D/F)", fontsize=13, fontweight="bold")
+    fig.suptitle("Subject-wise Grade Distribution (O/E/A/B/C/D/F)\n\n", fontsize=13, fontweight="bold")
     plt.tight_layout()
     return fig
 
@@ -570,7 +570,7 @@ def plot_subject_metric_comparison_bars(stats_df: pd.DataFrame):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-    fig.suptitle("Comparative Subject Metrics (Mean, Median, Std Dev, Skewness)", fontsize=13, fontweight="bold")
+    fig.suptitle("Comparative Subject Metrics (Mean, Median, Std Dev, Skewness)\n\n", fontsize=13, fontweight="bold")
     plt.tight_layout()
     return fig
 

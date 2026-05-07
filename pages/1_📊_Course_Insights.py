@@ -228,7 +228,7 @@ if data:
         
         st.divider()
 
-        st.pyplot(overview_fig, width="stretch")
+        st.pyplot(overview_fig, width="content")
 
         st.divider()
 
@@ -261,6 +261,7 @@ if data:
         st.subheader("Consolidated Result Matrix")
         st.caption("Subject-wise statistics: mean score, median, standard deviation, skewness, pass percentage, and full grade distribution (O → F). Higher skewness means more students scored below average — a harder paper.")
         if not stats_df.empty:
+            st.divider()
             st.dataframe(stats_df, width='stretch', hide_index=True)
             if "Skewness" in stats_df.columns:
                 hardest_subject = stats_df.loc[stats_df["Skewness"].idxmax()]["Subject"]
@@ -269,6 +270,7 @@ if data:
                     st.warning(f"⚠️ **Anomaly Detected:** The subject **{hardest_subject}** has the highest positive skewness ({highest_skew}). This indicates a difficult paper where the majority scored below average.")
             st.divider()
             st.markdown("#### 📊 Subject Grade Distribution Bars")
+            st.space("medium")
             subject_grade_bars_fig = plot_subject_grade_distribution_bars(stats_df)
             st.pyplot(subject_grade_bars_fig, width="stretch")
             st.markdown("#### 📈 Comparative Subject Metrics")
