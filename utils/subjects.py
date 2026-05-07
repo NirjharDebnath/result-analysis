@@ -112,7 +112,7 @@ def load_saved_subject_mapping() -> Dict[str, str]:
 
 def save_subject_mapping(mapping: Optional[Dict[object, object]]) -> None:
     normalized_mapping = normalize_subject_mapping(mapping)
-    temp_file = SUBJECT_MAPPING_FILE.with_suffix(".json.tmp")
+    temp_file = SUBJECT_MAPPING_FILE.parent / f"{SUBJECT_MAPPING_FILE.name}.tmp"
     with temp_file.open("w", encoding="utf-8") as handle:
         json.dump(normalized_mapping, handle, ensure_ascii=False, indent=2)
     temp_file.replace(SUBJECT_MAPPING_FILE)
