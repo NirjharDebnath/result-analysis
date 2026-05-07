@@ -69,17 +69,17 @@ def _subject_code_label(subject_label: str) -> str:
 def map_numeric_to_grade(value: float) -> Optional[str]:
     if pd.isna(value):
         return None
-    if value >= 9:
+    if value >= 10:
         return "O"
-    if value >= 8:
+    if value >= 9:
         return "E"
-    if value >= 7:
+    if value >= 8:
         return "A"
-    if value >= 6:
+    if value >= 7:
         return "B"
-    if value >= 5:
+    if value >= 6:
         return "C"
-    if value >= 4:
+    if value >= 5:
         return "D"
     return "F"
 
@@ -348,7 +348,7 @@ def plot_executive_overview(filtered_df: pd.DataFrame, current_class_mask: pd.Se
     )
 
     fig.suptitle("Executive Batch Overview — Comprehensive Analysis", fontsize=13, fontweight="bold")
-    plt.tight_layout()
+    # plt.tight_layout()
     return fig
 
 
@@ -378,7 +378,7 @@ def plot_z_score_distribution(z_df: pd.DataFrame, title: str = "Z-Score Distribu
     return fig
 
 
-def _plot_grade_split_pie(full_clean: pd.Series, title: str = "Grade Split (O/E/A/B/C/D/F)"):
+def _plot_grade_split_pie(full_clean: pd.Series, title: str = "Grade Split"):
     """Render a donut-style grade split pie chart from numeric grade-point values."""
     fig, ax_grade = plt.subplots(figsize=(6.8, 5.8))
     fig.patch.set_facecolor(BG_COLOR)
@@ -412,7 +412,7 @@ def _plot_grade_split_pie(full_clean: pd.Series, title: str = "Grade Split (O/E/
             frameon=False,
             fontsize=9,
         )
-        ax_grade.set_title(title, fontsize=11, fontweight="bold")
+        ax_grade.set_title(title, fontsize=11)
 
     plt.tight_layout()
     return fig
@@ -454,19 +454,20 @@ def plot_normal_curve(full_data: pd.Series, regular_data: pd.Series = None,
     p = norm.pdf(x, mean, std)
 
     ax.plot(x, p, 'k--', linewidth=2, label="Normal Curve")
-    ax.axvline(mean, color=PRIMARY_COLOR, linestyle="--", linewidth=2)
-    ax.axvline(mean - std, color=BACKLOG_COLOR, linestyle=":", linewidth=2)
-    ax.axvline(mean + std, color=ACCENT_COLOR, linestyle=":", linewidth=2)
+    ax.axvline(mean, color=PRIMARY_COLOR, linestyle="--", linewidth=2, label=f"Mean = {mean:.2f}")
+    ax.axvline(mean - std, color=BACKLOG_COLOR, linestyle=":", linewidth=2, label=f"-1σ = {mean-std:.2f}")
+    ax.axvline(mean + std, color=ACCENT_COLOR, linestyle=":", linewidth=2, label=f"+1σ = {mean+std:.2f}")
 
     label_y = 1.02
-    ax.text(mean, label_y, f"Mean = {mean:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=10, color="black")
-    ax.text(mean - std, label_y, f"-1σ = {mean-std:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=9, color="black")
-    ax.text(mean + std, label_y, f"+1σ = {mean+std:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=9, color="black")
+    # ax.text(mean, label_y, f"Mean = {mean:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=10, color="black")
+    # ax.text(mean - std, label_y, f"-1σ = {mean-std:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=9, color="black")
+    # ax.text(mean + std, label_y, f"+1σ = {mean+std:.2f}", transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=9, color="black")
 
     ax.set_title(title, fontsize=16, pad=20)
+    ax.set_xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     ax.set_xlabel("Values", fontsize=12)
     ax.set_ylabel("Density", fontsize=12)
-    ax.legend(loc="upper right")
+    ax.legend(loc="upper left")
     ax.grid(alpha=0.2)
     plt.tight_layout()
 
@@ -492,7 +493,7 @@ def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket 
         return fig
 
     bucket_ids = np.where(clean == GPA_MAX, GPA_MAX - 1, np.floor(clean)).astype(int)
-    counts = bucket_ids.value_counts().reindex(range(10), fill_value=0)
+    counts = pd.Series(bucket_ids).value_counts().reindex(range(10), fill_value=0)
     labels = [f"{i}-{i+1}" for i in range(10)]
 
     bars = ax.bar(labels, counts.values, color=ACCENT_COLOR, edgecolor="black", alpha=0.85)
@@ -509,11 +510,11 @@ def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket 
 
     ax.set_title(title, fontsize=14, pad=12)
     ax.set_xlabel("GPA Range")
-    ax.set_ylabel("Students")
+    ax.set_ylabel("Number of Students")
     ax.grid(axis="y", linestyle="--", alpha=0.25)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    plt.tight_layout()
+    # plt.tight_layout()
     return fig
 
 
@@ -665,7 +666,7 @@ def plot_subject_grade_distribution_bars(stats_df: pd.DataFrame, selected_subjec
         axes[idx].axis("off")
 
     fig.suptitle("Subject-wise Grade Distribution (O/E/A/B/C/D/F)\n\n", fontsize=13, fontweight="bold")
-    plt.tight_layout()
+    # plt.tight_layout()
     return fig
 
 
@@ -745,7 +746,7 @@ def plot_subject_metric_comparison_bars(
     else:
         fig.suptitle(f"Comparative Subject Metric — {selected_metric}\n", fontsize=13, fontweight="bold")
 
-    plt.tight_layout()
+    # plt.tight_layout()
     return fig
 
 
@@ -766,7 +767,7 @@ def plot_semester_metric_bars(comparison_df: pd.DataFrame, metric: str, selected
 
     ax.bar(x_labels, y_vals, color=colors, edgecolor="black", alpha=0.85)
 
-    plt.tight_layout()
+    # plt.tight_layout()
     return fig
 
 

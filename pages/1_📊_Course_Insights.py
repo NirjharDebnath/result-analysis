@@ -6,7 +6,7 @@ from utils.constants import COLLEGE_NAME, LOGO_CANDIDATE_PATHS, SOFT_COLORS, UI_
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
 from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer
-from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask
+from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask, get_semester_order
 from utils.charts import (
     plot_status_bars,
     plot_normal_curve,
@@ -141,6 +141,7 @@ st.caption("Use the sidebar to select a course and semester. This page analyses 
 
 data = require_data()
 if data:
+    
     df, all_subject_cols = data
     subject_mapping = get_subject_mapping()
     format_subject = subject_label_formatter(subject_mapping)
@@ -150,6 +151,28 @@ if data:
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
+    
+    current_class_mask, old_batch_mask = get_class_masks(filtered_df)
+
+    # --- CALCULATE ACADEMIC YEAR & EXAM SESSION ---
+    sem_order = get_semester_order(selected_semester)
+    if sem_order != 999:
+        year_num = (sem_order + 1) // 2
+        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
+        academic_year_str = f"{ordinal(year_num)} Year"
+    else:
+        academic_year_str = "Unknown Year"
+
+    exam_session_str = ""
+    if "EXAM SESSION" in filtered_df.columns:
+        mode_session = filtered_df["EXAM SESSION"].mode()
+        if not mode_session.empty:
+            exam_session_str = str(mode_session.iloc[0])
+
+    # --- PROMINENT UI DISPLAY ---
+    st.markdown(f"### 🎓 **{academic_year_str}** | {selected_semester}")
+    if exam_session_str:
+        st.caption(f"🗓️ **Exam Conducted:** {exam_session_str}")
 
     # --- SUBJECT FILTER ---
     skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
@@ -294,6 +317,20 @@ if data:
 
     with tab3:
         st.subheader("Statistical Bell Curves")
+        with st.expander("💡 What is a Normal Distribution (Bell Curve) & What does it tell us?"):
+            st.markdown("""
+            A **Normal Distribution** is a visual representation of how grades are spread across the entire batch. In a perfectly balanced exam, the data naturally forms a symmetrical "Bell Curve", where the majority of students score near the class average (the peak), and fewer students score exceptionally high or low (the tails).
+
+            **The Golden Rule (68-95-99.7 Rule):**
+            In a standard normal distribution:
+            * ~**68%** of students fall within 1 Standard Deviation ($\pm 1\sigma$) of the Mean ($\mu$). This is your "average" majority.
+            * ~**95%** of students fall within 2 Standard Deviations ($\pm 2\sigma$).
+
+            **How it helps us analyze results:**
+            * **Detect Paper Difficulty (Skewness):** If the curve's peak is shifted heavily to the left, it means most students scored poorly, indicating a **tough paper** or strict grading. If shifted to the right, it was an **easy paper**.
+            * **Measure Batch Disparity (Width):** A **wide and flat** curve (high standard deviation) means there is a massive gap between the top students and the bottom students. A **tall and narrow** curve means the batch is highly consistent and learned at the same pace.
+            * **Identify True Outliers:** The shaded regions visually isolate the exceptional performers (the far right tail) and those who might need immediate academic intervention (the far left tail).
+            """)
         st.caption("GPA metrics show bucket-wise student counts first, followed by a separate normal-distribution analysis with mean, standard deviation, and σ-region coverage. Subject distributions keep the histogram+curve view with the grade split pie chart shown below.")
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
@@ -309,10 +346,10 @@ if data:
                 selected_gpa = st.selectbox("Select GPA Metric", valid_gpa_cols)
                 full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
                 reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
-                gpa_bucket_fig = plot_gpa_bucket_distribution(full_gpa, title=f"{selected_gpa} Bucket Distribution")
+                gpa_bucket_fig = plot_gpa_bucket_distribution(full_gpa, title=f"{selected_gpa} Distribution")
                 gpa_curve_fig = plot_normal_distribution_stats(
                     reg_gpa if reg_gpa is not None else full_gpa,
-                    title=f"{selected_gpa} Normal Distribution Stats",
+                    title=f"{selected_gpa} Normal Distribution",
                     is_grade_scale=False,
                 )
                 st.pyplot(gpa_bucket_fig, width='stretch')
@@ -326,9 +363,9 @@ if data:
                     format_func=format_subject,
                 )
 
-                full_grades = filtered_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
+                full_grades = display_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
-
+                # print(full_subj)
                 if not exclude_old_batch:
                     reg_grades = filtered_df[current_class_mask][selected_subj].apply(lambda x: parse_grade_value(x)[0])
                     reg_subj = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
@@ -359,15 +396,42 @@ if data:
             try:
                 z_df = calculate_z_scores(display_df, target_col)
                 if not z_df.empty:
-                    z_summary_df = z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
+                    st.write("**Filter Learners by Performance Category:**")
+                    with st.expander("💡 What is Z-Score Analysis & Why does it matter?"):
+                        st.markdown("""
+                        **Z-Score** is a statistical measurement that tells us how far a student's score is from the class average, measured in standard deviations. 
+
+                        **The Formula:** $$Z = \\frac{(X - \\mu)}{\\sigma}$$  
+                        *(Where $X$ is the student's score, $\\mu$ is the class mean, and $\\sigma$ is the standard deviation).*
+
+                        **How it helps us here:**
+                        Raw marks don't always tell the whole story. For example, scoring a 7 in a notoriously difficult subject where the class average is a 5 is a massive achievement. Conversely, scoring an 8 in an easy subject where everyone scored a 9 means the student actually underperformed relative to their peers.
+                        
+                        By converting grades to Z-Scores, we can:
+                        * **Standardize Performance:** Compare a student's true performance across *different subjects* with varying difficulty levels.
+                        * **Find True Outliers:** Accurately identify **Strong Performers** ($Z > +1$) and those who **Need Attention** ($Z < -1$), regardless of how hard or easy the question paper was.
+                        """)
+                    st.caption(" Students who fall under the > +1σ category are refered to as strong learners while those who fall under the < -1σ category are refered to as the weak learners category and the rest are categorised as decent. (*Note*: Discrimination is done only on mathematical basis and no personal biasness is involved in the process)")
+                    perf_categories = ["Strong (> +1σ)", "Decent (-1σ to +1σ)", "Weak (< -1σ)"]
+                    
+                    selected_perfs = st.multiselect(
+                        "Select categories to display (These will also be exported to the PDF)",
+                        options=perf_categories,
+                        default=["Strong (> +1σ)", "Weak (< -1σ)"],
+                        label_visibility="collapsed"
+                    )
+                    
+                    filtered_z_df = z_df[z_df["Performance"].isin(selected_perfs)]
+                    
+                    z_summary_df = filtered_z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary_df.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
                     st.dataframe(z_summary_df, width='stretch', hide_index=True)
 
                     st.write("") 
                     c_top, c_worst = st.columns(2)
                     if len(z_df) > 0:
-                        c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
-                        c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
+                        c_top.success(f"🏆 **Top Performer (Overall):** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
+                        c_worst.error(f"⚠️ **Needs Attention (Overall):** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
                 else:
                     st.warning(f"Not enough valid numerical data to calculate Z-Scores for {format_subject(target_col)}.")
             except Exception as e:
@@ -476,10 +540,29 @@ if data:
                             logo_path = candidate
                             break
                     
+                    sem_order = get_semester_order(selected_semester)
+                    if sem_order != 999:
+                        year_num = (sem_order + 1) // 2
+                        suffixes = {1: 'st', 2: 'nd', 3: 'rd'}
+                        suffix = suffixes.get(year_num if year_num <= 3 else 0, 'th')
+                        year_name_str = f"{year_num}{suffix} Year"
+                    else:
+                        year_name_str = "Unknown Year"
+
+                    # 2. Get the Exam Year/Session
+                    exam_session_str = ""
+                    if "EXAM SESSION" in filtered_df.columns:
+                        mode_val = filtered_df["EXAM SESSION"].mode()
+                        if not mode_val.empty:
+                            exam_session_str = str(mode_val.iloc[0])
+
+                    # 3. Update the create_master_report_pdf call
                     pdf_bytes = create_master_report_pdf(
                         college_name=COLLEGE_NAME,
                         course_name=course_name_string,
                         semester=selected_semester,
+                        year_name=year_name_str,       # New parameter
+                        exam_session=exam_session_str, # New parameter
                         summary_table=summary,
                         status_fig=status_fig, 
                         subject_stats_df=stats_df, 

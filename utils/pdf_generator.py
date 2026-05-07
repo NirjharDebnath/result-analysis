@@ -4,6 +4,18 @@ import tempfile
 import os
 import pandas as pd
 
+class KGEC_PDF(FPDF):
+    def __init__(self, logo_path=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logo_path = logo_path
+
+    def header(self):
+        # 1. Subtle Watermark Logo (Appears on every page behind text)
+        if self.logo_path and os.path.exists(self.logo_path):
+            with self.local_context(fill_opacity=0.08):  # Subtle 8% opacity
+                # Centers the logo: A4 width is 210mm. (210-120)/2 = 45
+                self.image(self.logo_path, x=45, y=90, w=120)
+
 def clean_text(text):
     """Sanitizes text to prevent FPDF Unicode crashes."""
     if pd.isna(text): return ""
@@ -14,6 +26,8 @@ def create_master_report_pdf(
     college_name, 
     course_name, 
     semester, 
+    year_name,      # Added
+    exam_session,   # Added
     summary_table, 
     status_fig, 
     subject_stats_df,
@@ -41,12 +55,23 @@ def create_master_report_pdf(
     STACK_BOTTOM_PADDING = 10
 
     # --- Page 1: Header + Batch Overview Graph ---
+    pdf = KGEC_PDF(logo_path=logo_path)
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     # College name centered at the top
     pdf.set_font("Arial", "B", 15)
     pdf.cell(190, 8, clean_text(college_name), ln=True, align="C")
-
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 7, clean_text(f"{course_name} | {year_name}"), ln=True, align="C")
+    pdf.set_font("Arial", "", 10)
+    session_info = f"Semester: {semester}"
+    if exam_session:
+        session_info += f" | Exam Session: {exam_session}"
+    pdf.cell(190, 6, clean_text(session_info), ln=True, align="C")
+    
+    pdf.ln(10)
     # Logo centered below college name
     if logo_path and os.path.exists(logo_path):
         logo_w = 22  # mm
@@ -57,7 +82,7 @@ def create_master_report_pdf(
     pdf.set_font("Arial", "B", 11)
     pdf.cell(190, 7, clean_text(f"Combined Result Analysis Report - {course_name}"), ln=True, align="C")
     pdf.set_font("Arial", "", 9)
-    pdf.cell(190, 6, clean_text(f"Semester: {semester}"), ln=True, align="C")
+    pdf.cell(190, 6, clean_text(f"Semester: {semester} | {year_name}"), ln=True, align="C")
     pdf.ln(4)
 
     # Overview graph

@@ -5,7 +5,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
-from utils.constants import LOGO_CANDIDATE_PATHS, SOFT_COLORS
+from utils.constants import LOGO_CANDIDATE_PATHS, SOFT_COLORS, COLLEGE_NAME
 
 def downloadable_plot(fig, filename: str):
     fig.tight_layout()
@@ -42,6 +42,16 @@ def render_sidebar_branding():
     st.sidebar.markdown(
         """
         <style>
+            [data-testid="stSidebarNav"]::before {{
+                content: "{COLLEGE_NAME}";
+                margin-left: 20px;
+                margin-top: 20px;
+                margin-bottom: 10px;
+                font-size: 1.2rem;
+                font-weight: 700;
+                color: #2F3A45;
+                display: block;
+            }}
             div[data-testid="stSidebarUserContent"] {
                 min-height: 100vh;
                 display: flex;
