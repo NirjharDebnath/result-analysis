@@ -7,7 +7,14 @@ from utils.processor import require_data, apply_course_stream_filters, get_gpa_c
 from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer
 from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask
-from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution, plot_executive_overview
+from utils.charts import (
+    plot_status_bars,
+    plot_normal_curve,
+    plot_z_score_distribution,
+    plot_executive_overview,
+    plot_subject_grade_distribution_bars,
+    plot_subject_metric_comparison_bars,
+)
 from utils.pdf_generator import create_master_report_pdf
 
 st.set_page_config(page_title="Course Insights", page_icon="📊", layout="wide")
@@ -197,6 +204,8 @@ if data:
     gpa_curve_fig = None
     subject_curve_fig = None
     z_summary_df = pd.DataFrame()
+    subject_grade_bars_fig = None
+    subject_metric_comp_fig = None
 
     # Pre-compute valid GPA columns: only those with actual numeric data for the selected course/semester
     _all_gpa_cols = get_gpa_columns(filtered_df)
@@ -258,6 +267,13 @@ if data:
                 highest_skew = stats_df["Skewness"].max()
                 if highest_skew > 0.5: 
                     st.warning(f"⚠️ **Anomaly Detected:** The subject **{hardest_subject}** has the highest positive skewness ({highest_skew}). This indicates a difficult paper where the majority scored below average.")
+            st.divider()
+            st.markdown("#### 📊 Subject Grade Distribution Bars")
+            subject_grade_bars_fig = plot_subject_grade_distribution_bars(stats_df)
+            st.pyplot(subject_grade_bars_fig, width="stretch")
+            st.markdown("#### 📈 Comparative Subject Metrics")
+            subject_metric_comp_fig = plot_subject_metric_comparison_bars(stats_df)
+            st.pyplot(subject_metric_comp_fig, width="stretch")
 
     with tab3:
         st.subheader("Statistical Bell Curves")
@@ -346,6 +362,7 @@ if data:
             include_comp = st.checkbox("Include Semester Comparison Graph in PDF", value=True)
         else:
             st.info("💡 To include a comparison graph, visit the 'Semester Comparison' page and generate one first.")
+        include_stat_visuals = st.checkbox("Include Statistical Matrix visual charts in PDF", value=True)
 
         if st.button("Generate Master Report PDF"):
             with st.spinner("Generating graphs for all subjects and building PDF (this might take a few seconds)..."):
@@ -428,12 +445,18 @@ if data:
                         overview_fig=overview_fig,
                         batch_overview_data=batch_overview_data,
                         logo_path=logo_path,
+                        stat_grade_fig=subject_grade_bars_fig if include_stat_visuals else None,
+                        stat_metric_fig=subject_metric_comp_fig if include_stat_visuals else None,
                     )
                     
                     for fig in all_subject_figs:
                         plt.close(fig)
                     for fig in all_gpa_figs:
                         plt.close(fig)
+                    if subject_grade_bars_fig is not None:
+                        plt.close(subject_grade_bars_fig)
+                    if subject_metric_comp_fig is not None:
+                        plt.close(subject_metric_comp_fig)
                     
                     st.download_button(
                         label="Download Full Report",
