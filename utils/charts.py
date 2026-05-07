@@ -50,6 +50,15 @@ GRADE_COLORS = {
     "F": FAIL_COLOR,
 }
 
+GRADE_SCALE_MIN = -1
+GRADE_SCALE_MAX = 11
+GPA_MIN = 0
+GPA_MAX = 10
+NORMAL_SPAN_MULTIPLIER = 3
+MIN_SPAN = 0.5
+MIN_DISTRIBUTION_RANGE = 1
+HALF_RANGE_PADDING = 0.5
+
 
 def _subject_code_label(subject_label: str) -> str:
     """Extract the short subject code from a 'CODE - Subject Name' label."""
@@ -522,14 +531,14 @@ def plot_normal_distribution_stats(
     std = clean.std()
 
     if is_grade_scale:
-        xmin, xmax = -1, 11
+        xmin, xmax = GRADE_SCALE_MIN, GRADE_SCALE_MAX
     else:
-        span = max(3 * std, 0.5)
-        xmin = max(0, mean - span)
-        xmax = min(10, mean + span)
-        if xmax - xmin < 1:
-            xmin = max(0, mean - 0.5)
-            xmax = min(10, mean + 0.5)
+        span = max(NORMAL_SPAN_MULTIPLIER * std, MIN_SPAN)
+        xmin = max(GPA_MIN, mean - span)
+        xmax = min(GPA_MAX, mean + span)
+        if xmax - xmin < MIN_DISTRIBUTION_RANGE:
+            xmin = max(GPA_MIN, mean - HALF_RANGE_PADDING)
+            xmax = min(GPA_MAX, mean + HALF_RANGE_PADDING)
 
     x = np.linspace(xmin, xmax, 400)
     p = norm.pdf(x, mean, std)

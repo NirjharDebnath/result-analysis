@@ -32,7 +32,7 @@ def create_master_report_pdf(
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     tmp_files_to_clean = []
-    PAGE_CONTENT_LIMIT_Y = 280
+    PAGE_CONTENT_LIMIT_Y = pdf.h - 17  # Keep visual pairs above bottom margin for A4 portrait.
     TOP_FIG_HEIGHT_EST = 88
     BOTTOM_FIG_HEIGHT_EST = 82
 
