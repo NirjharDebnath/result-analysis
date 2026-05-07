@@ -8,6 +8,7 @@ from utils.subjects import (
     SUBJECT_NAME_COLUMN,
     SUBJECT_MAPPING_STATE_KEY,
     get_subject_mapping,
+    save_subject_mapping,
     subject_label_formatter,
     subject_mapping_from_dataframe,
     subject_mapping_to_dataframe,
@@ -268,8 +269,16 @@ edited_subject_mapping_df = st.data_editor(
 
 updated_subject_mapping = subject_mapping_from_dataframe(edited_subject_mapping_df)
 if updated_subject_mapping != subject_mapping:
-    st.session_state[SUBJECT_MAPPING_STATE_KEY] = updated_subject_mapping
-    st.rerun()
+    try:
+        save_subject_mapping(updated_subject_mapping)
+        st.session_state[SUBJECT_MAPPING_STATE_KEY] = updated_subject_mapping
+        st.session_state["subject_mapping_update_notice"] = True
+        st.rerun()
+    except OSError as exc:
+        st.error(f"Unable to save subject mapping permanently. Details: {exc}")
+
+if st.session_state.pop("subject_mapping_update_notice", False):
+    st.warning("⚠️ Subject code/name updates were saved permanently and will apply in future sessions.")
 
 st.caption(f"{len(updated_subject_mapping)} subject mappings available in the current session.")
 

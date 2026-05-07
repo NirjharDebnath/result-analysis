@@ -1,5 +1,7 @@
 import re
+import json
 from typing import Dict, Optional
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -75,6 +77,7 @@ SUBJECT_MAPPING_STATE_KEY = "subject_mapping"
 SUBJECT_CODE_COLUMN = "Subject Code"
 SUBJECT_NAME_COLUMN = "Subject Name"
 _SUBJECT_CODE_SUFFIX_PATTERN = re.compile(r"^(.*?)(\s*\(\d+\))?$")
+SUBJECT_MAPPING_FILE = Path(__file__).with_name("subject_mapping.json")
 
 
 def normalize_subject_code(code: object) -> str:
@@ -96,12 +99,31 @@ def normalize_subject_mapping(mapping: Optional[Dict[object, object]]) -> Dict[s
 DEFAULT_SUBJECTS = normalize_subject_mapping(subjects)
 
 
+def load_saved_subject_mapping() -> Dict[str, str]:
+    if not SUBJECT_MAPPING_FILE.exists():
+        return {}
+    try:
+        with SUBJECT_MAPPING_FILE.open("r", encoding="utf-8") as handle:
+            loaded_mapping = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return normalize_subject_mapping(loaded_mapping if isinstance(loaded_mapping, dict) else {})
+
+
+def save_subject_mapping(mapping: Optional[Dict[object, object]]) -> None:
+    normalized_mapping = normalize_subject_mapping(mapping)
+    temp_file = SUBJECT_MAPPING_FILE.with_suffix(".json.tmp")
+    with temp_file.open("w", encoding="utf-8") as handle:
+        json.dump(normalized_mapping, handle, ensure_ascii=False, indent=2)
+    temp_file.replace(SUBJECT_MAPPING_FILE)
+
+
 def get_subject_mapping() -> Dict[str, str]:
     current_mapping = st.session_state.get(SUBJECT_MAPPING_STATE_KEY)
     normalized_mapping = (
         normalize_subject_mapping(current_mapping)
         if isinstance(current_mapping, dict)
-        else DEFAULT_SUBJECTS.copy()
+        else load_saved_subject_mapping() or DEFAULT_SUBJECTS.copy()
     )
     if current_mapping != normalized_mapping:
         st.session_state[SUBJECT_MAPPING_STATE_KEY] = normalized_mapping.copy()
