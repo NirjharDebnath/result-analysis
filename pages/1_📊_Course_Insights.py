@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME, LOGO_CANDIDATE_PATHS, SOFT_COLORS, UI_THEME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
+from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer
 from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask
 from utils.charts import plot_status_bars, plot_normal_curve, plot_z_score_distribution, plot_executive_overview
@@ -132,6 +133,8 @@ st.caption("Use the sidebar to select a course and semester. This page analyses 
 data = require_data()
 if data:
     df, all_subject_cols = data
+    subject_mapping = get_subject_mapping()
+    format_subject = subject_label_formatter(subject_mapping)
     st.sidebar.header("Data Filters")
     course_df = apply_course_stream_filters(df, "Select Course", "insight_course")
 
@@ -187,6 +190,9 @@ if data:
             stats_df.insert(loc, "Pass %", pass_pct)
         else:
             stats_df["Pass %"] = pass_pct
+
+    if not stats_df.empty and "Subject" in stats_df.columns:
+        stats_df["Subject"] = stats_df["Subject"].apply(format_subject)
 
     gpa_curve_fig = None
     subject_curve_fig = None
@@ -275,7 +281,11 @@ if data:
 
         with col_subj:
             if valid_subjects:
-                selected_subj = st.selectbox("Select Subject", valid_subjects)
+                selected_subj = st.selectbox(
+                    "Select Subject",
+                    valid_subjects,
+                    format_func=format_subject,
+                )
 
                 full_grades = filtered_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
@@ -286,7 +296,12 @@ if data:
                 else:
                     reg_subj = None
 
-                subject_curve_fig = plot_normal_curve(full_subj, reg_subj, title=f"{selected_subj} Distribution", is_grade_scale=True)
+                subject_curve_fig = plot_normal_curve(
+                    full_subj,
+                    reg_subj,
+                    title=f"{format_subject(selected_subj)} Distribution",
+                    is_grade_scale=True,
+                )
                 st.pyplot(subject_curve_fig, width='stretch')
 
         st.divider()
@@ -299,7 +314,7 @@ if data:
             target_col = selected_gpa
 
         if target_col:
-            st.markdown(f"#### 🔍 Z-Score Analysis for: **{target_col}**")
+            st.markdown(f"#### 🔍 Z-Score Analysis for: **{format_subject(target_col)}**")
             try:
                 z_df = calculate_z_scores(display_df, target_col)
                 if not z_df.empty:
@@ -313,9 +328,9 @@ if data:
                         c_top.success(f"🏆 **Top Performer:** {z_df.iloc[0]['NAME']}  \n*(Z-Score: +{z_df.iloc[0]['Z-Score']:.2f}, Value: {z_df.iloc[0]['NUMERIC_VAL']})*")
                         c_worst.error(f"⚠️ **Needs Attention:** {z_df.iloc[-1]['NAME']}  \n*(Z-Score: {z_df.iloc[-1]['Z-Score']:.2f}, Value: {z_df.iloc[-1]['NUMERIC_VAL']})*")
                 else:
-                    st.warning(f"Not enough valid numerical data to calculate Z-Scores for {target_col}.")
+                    st.warning(f"Not enough valid numerical data to calculate Z-Scores for {format_subject(target_col)}.")
             except Exception as e:
-                st.error(f"Could not calculate Z-scores for {target_col}. Error: {e}")
+                st.error(f"Could not calculate Z-scores for {format_subject(target_col)}. Error: {e}")
 
     with tab4:
         st.subheader("📥 Export Master PDF Report")
@@ -351,7 +366,12 @@ if data:
                         else:
                             reg_subj_num = None
 
-                        fig = plot_normal_curve(full_subj_num, reg_subj_num, title=f"{subj} Distribution", is_grade_scale=True)
+                        fig = plot_normal_curve(
+                            full_subj_num,
+                            reg_subj_num,
+                            title=f"{format_subject(subj)} Distribution",
+                            is_grade_scale=True,
+                        )
                         if fig is not None:
                             all_subject_figs.append(fig)
 

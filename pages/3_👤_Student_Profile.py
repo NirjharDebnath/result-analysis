@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME, PASSING_GRADES, SOFT_COLORS, UI_THEME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
+from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Student Profile", page_icon="👤", layout="wide")
@@ -129,6 +130,8 @@ st.caption("Look up any individual student's grades and GPA across all subjects.
 data = require_data()
 if data:
     df, all_subject_cols = data
+    subject_mapping = get_subject_mapping()
+    format_subject = subject_label_formatter(subject_mapping)
     course_df = apply_course_stream_filters(df, "Select Course", "student_course")
 
     student_options = (
@@ -181,7 +184,7 @@ if data:
                 status = "Unknown"
 
             subject_rows.append({
-                "SUBJECT": subject,
+                "SUBJECT": format_subject(subject),
                 "GRADE": grade if grade else "N/A",
                 "STATUS": status
             })
@@ -199,4 +202,3 @@ if data:
             st.info(f"**Overall Degree/Year Status:** {overall_result} | Summary: {len(subj_df)} Subjects Evaluated | {backlog_count} Current Backlogs Detected")
 
 render_footer()
-

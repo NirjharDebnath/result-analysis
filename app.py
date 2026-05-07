@@ -3,6 +3,15 @@ import streamlit as st
 from datetime import datetime, timezone
 from utils.constants import COLLEGE_NAME, SOFT_COLORS, UI_THEME
 from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
+from utils.subjects import (
+    SUBJECT_CODE_COLUMN,
+    SUBJECT_NAME_COLUMN,
+    SUBJECT_MAPPING_STATE_KEY,
+    get_subject_mapping,
+    subject_label_formatter,
+    subject_mapping_from_dataframe,
+    subject_mapping_to_dataframe,
+)
 from utils.analytics import build_semester_year_groups
 from utils.visualizer import render_sidebar_branding, render_footer
 
@@ -122,6 +131,8 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 render_sidebar_branding()
+subject_mapping = get_subject_mapping()
+format_subject = subject_label_formatter(subject_mapping)
 
 st.header(COLLEGE_NAME)
 st.title("📁 Upload Your Result Dataset")
@@ -231,9 +242,35 @@ if uploaded_files:
             with col2:
                 st.subheader("Subject Columns")
                 st.caption("These columns contain subject-wise grades or marks.")
-                st.write(subject_cols)
+                st.write([format_subject(col) for col in subject_cols])
                 
     except Exception as exc:
         st.error(f"Unable to read uploaded file. Details: {exc}")
+
+st.divider()
+st.subheader("🗂️ Subject Code Reference")
+st.caption(
+    "Preview and edit the subject labels used across tables, charts, and PDFs. "
+    "Add or delete rows here when subject codes change, without editing the code."
+)
+
+edited_subject_mapping_df = st.data_editor(
+    subject_mapping_to_dataframe(subject_mapping),
+    key="subject_mapping_editor",
+    hide_index=True,
+    num_rows="dynamic",
+    width="stretch",
+    column_config={
+        SUBJECT_CODE_COLUMN: st.column_config.TextColumn(SUBJECT_CODE_COLUMN, required=False),
+        SUBJECT_NAME_COLUMN: st.column_config.TextColumn(SUBJECT_NAME_COLUMN, required=False, width="large"),
+    },
+)
+
+updated_subject_mapping = subject_mapping_from_dataframe(edited_subject_mapping_df)
+if updated_subject_mapping != subject_mapping:
+    st.session_state[SUBJECT_MAPPING_STATE_KEY] = updated_subject_mapping
+    st.rerun()
+
+st.caption(f"{len(updated_subject_mapping)} subject mappings available in the current session.")
 
 render_footer()

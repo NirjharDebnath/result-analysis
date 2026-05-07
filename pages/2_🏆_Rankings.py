@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 from utils.constants import COLLEGE_NAME, SOFT_COLORS, UI_THEME
 from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
+from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer, download_table_button
 
 st.set_page_config(page_title="Rankings", page_icon="🏆", layout="wide")
@@ -129,6 +130,8 @@ st.caption("Rank students by GPA, individual subject marks, or total marks. Use 
 data = require_data()
 if data:
     df, subject_cols = data
+    subject_mapping = get_subject_mapping()
+    format_subject = subject_label_formatter(subject_mapping)
     course_df = apply_course_stream_filters(df, "Select Course", "rank_course")
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.selectbox("Select Semester", semesters, key="rank_sem")
@@ -167,7 +170,11 @@ if data:
         if not valid_subject_choices:
             st.warning("No subjects found with data for this specific course and semester.")
         else:
-            metric_col = st.selectbox("Select Subject", valid_subject_choices)
+            metric_col = st.selectbox(
+                "Select Subject",
+                valid_subject_choices,
+                format_func=format_subject,
+            )
             # Extract numeric value from Grade(Points) format
             rank_df[metric_col] = filtered_df[metric_col].apply(lambda x: parse_grade_value(x)[1])
 
@@ -190,8 +197,11 @@ if data:
         rank_df = rank_df.dropna(subset=[metric_col]).copy()
         rank_df["RANK"] = rank_df[metric_col].rank(method=rank_method, ascending=False).astype(int)
         rank_df = rank_df.sort_values(["RANK", metric_col, "NAME"], ascending=[True, False, True])
+        display_rank_df = rank_df.rename(
+            columns={metric_col: format_subject(metric_col)}
+        )
 
-        st.dataframe(rank_df, width='stretch')
-        download_table_button(rank_df, "Download rank list", "rank_list.csv")
+        st.dataframe(display_rank_df, width='stretch')
+        download_table_button(display_rank_df, "Download rank list", "rank_list.csv")
 
 render_footer()
