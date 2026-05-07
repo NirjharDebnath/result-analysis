@@ -475,7 +475,8 @@ def plot_gpa_bucket_distribution(full_data: pd.Series, title: str = "GPA Bucket 
         ax.axis("off")
         return fig
 
-    bucket_ids = np.floor(np.clip(clean, 0, 9.999)).astype(int)
+    bucket_ids = np.floor(np.clip(clean, 0, None)).astype(int)
+    bucket_ids = np.where(bucket_ids >= 10, 9, bucket_ids)
     counts = bucket_ids.value_counts().reindex(range(10), fill_value=0)
     labels = [f"{i}-{i+1}" for i in range(10)]
 
@@ -534,8 +535,17 @@ def plot_normal_distribution_stats(
 
     ax.plot(x, p, color="black", linewidth=2.2, label="Normal Curve")
     ax.fill_between(x, 0, p, where=(x >= mean - std) & (x <= mean + std), color=PASS_COLOR, alpha=0.18, label="±1σ region")
-    ax.fill_between(x, 0, p, where=((x >= mean - 2 * std) & (x < mean - std)) | ((x > mean + std) & (x <= mean + 2 * std)),
-                    color=ACCENT_COLOR, alpha=0.12, label="1σ to 2σ region")
+    left_outer_band = (x >= mean - 2 * std) & (x < mean - std)
+    right_outer_band = (x > mean + std) & (x <= mean + 2 * std)
+    ax.fill_between(
+        x,
+        0,
+        p,
+        where=left_outer_band | right_outer_band,
+        color=ACCENT_COLOR,
+        alpha=0.12,
+        label="1σ to 2σ region",
+    )
 
     ax.axvline(mean, color=PRIMARY_COLOR, linestyle="--", linewidth=2)
     ax.axvline(mean - std, color=BACKLOG_COLOR, linestyle=":", linewidth=2)

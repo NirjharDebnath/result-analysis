@@ -32,6 +32,9 @@ def create_master_report_pdf(
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     tmp_files_to_clean = []
+    PAGE_CONTENT_LIMIT_Y = 280
+    TOP_FIG_HEIGHT_EST = 88
+    BOTTOM_FIG_HEIGHT_EST = 82
 
     # --- Page 1: Header + Batch Overview Graph ---
     pdf.add_page()
@@ -165,10 +168,10 @@ def create_master_report_pdf(
 
     def _draw_vertical_pair(top_fig, bottom_fig=None, top_width=152, bottom_width=110):
         """Render one figure on top and optional second figure below it."""
-        top_height_est = 88
-        bottom_height_est = 82 if bottom_fig is not None else 0
+        top_height_est = TOP_FIG_HEIGHT_EST
+        bottom_height_est = BOTTOM_FIG_HEIGHT_EST if bottom_fig is not None else 0
         required = top_height_est + (bottom_height_est + 8 if bottom_fig is not None else 0)
-        if pdf.get_y() + required > 280:
+        if pdf.get_y() + required > PAGE_CONTENT_LIMIT_Y:
             pdf.add_page()
 
         y_start = pdf.get_y()
