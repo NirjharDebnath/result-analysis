@@ -1,3 +1,10 @@
+import re
+from typing import Dict, Optional
+
+import pandas as pd
+import streamlit as st
+
+
 subjects = {
     # ================= SEMESTER 1 =================
     "BS-M101": "Mathematics-IA",
@@ -63,3 +70,78 @@ subjects = {
     "PROJ-CS881": "Project / Dissertation",
     "INT-CS881": "Internship"
 }
+
+SUBJECT_MAPPING_STATE_KEY = "subject_mapping"
+SUBJECT_CODE_COLUMN = "Subject Code"
+SUBJECT_NAME_COLUMN = "Subject Name"
+_DUPLICATE_SUFFIX_PATTERN = re.compile(r"^(.*?)(\s*\(\d+\))?$")
+
+
+def normalize_subject_code(code: object) -> str:
+    if code is None:
+        return ""
+    return str(code).strip().upper()
+
+
+def normalize_subject_mapping(mapping: Optional[Dict[object, object]]) -> Dict[str, str]:
+    normalized: Dict[str, str] = {}
+    for code, name in (mapping or {}).items():
+        normalized_code = normalize_subject_code(code)
+        normalized_name = str(name).strip() if name is not None else ""
+        if normalized_code and normalized_name:
+            normalized[normalized_code] = normalized_name
+    return dict(sorted(normalized.items()))
+
+
+DEFAULT_SUBJECTS = normalize_subject_mapping(subjects)
+subjects = DEFAULT_SUBJECTS.copy()
+
+
+def get_subject_mapping() -> Dict[str, str]:
+    current_mapping = st.session_state.get(SUBJECT_MAPPING_STATE_KEY)
+    normalized_mapping = (
+        normalize_subject_mapping(current_mapping)
+        if isinstance(current_mapping, dict)
+        else DEFAULT_SUBJECTS.copy()
+    )
+    st.session_state[SUBJECT_MAPPING_STATE_KEY] = normalized_mapping.copy()
+    return normalized_mapping
+
+
+def subject_mapping_to_dataframe(mapping: Optional[Dict[object, object]] = None) -> pd.DataFrame:
+    active_mapping = normalize_subject_mapping(mapping) if mapping is not None else get_subject_mapping()
+    rows = [
+        {SUBJECT_CODE_COLUMN: code, SUBJECT_NAME_COLUMN: name}
+        for code, name in active_mapping.items()
+    ]
+    return pd.DataFrame(rows, columns=[SUBJECT_CODE_COLUMN, SUBJECT_NAME_COLUMN])
+
+
+def subject_mapping_from_dataframe(df: Optional[pd.DataFrame]) -> Dict[str, str]:
+    if df is None or df.empty:
+        return {}
+
+    mapping: Dict[str, str] = {}
+    for _, row in df.iterrows():
+        code = normalize_subject_code(row.get(SUBJECT_CODE_COLUMN))
+        name = str(row.get(SUBJECT_NAME_COLUMN, "")).strip()
+        if code and name:
+            mapping[code] = name
+    return dict(sorted(mapping.items()))
+
+
+def format_subject_label(subject_code: object, mapping: Optional[Dict[object, object]] = None) -> str:
+    raw_subject = "" if subject_code is None else str(subject_code).strip()
+    if not raw_subject:
+        return raw_subject
+
+    match = _DUPLICATE_SUFFIX_PATTERN.match(raw_subject)
+    base_code = match.group(1).strip() if match else raw_subject
+    suffix = match.group(2) or ""
+
+    active_mapping = normalize_subject_mapping(mapping) if mapping is not None else get_subject_mapping()
+    subject_name = active_mapping.get(normalize_subject_code(base_code))
+    if not subject_name:
+        return raw_subject
+
+    return f"{base_code}{suffix} - {subject_name}"
