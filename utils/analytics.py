@@ -25,6 +25,7 @@ ROLL_YEAR_END_INDEX = 8
 # Sentinel value used throughout to indicate "semester order unknown / unparseable".
 UNKNOWN_SEMESTER_ORDER = 999
 GRADE_TO_POINT = {"O": 10, "E": 9, "A": 8, "B": 7, "C": 6, "D": 5, "F": 0}
+CACHE_TTL = 1800
 
 def normalize_semester_label(semester_value: object) -> str:
     text = str(semester_value).strip() if semester_value is not None else ""
@@ -385,8 +386,10 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     old_batch_mask.loc[parsed.index] = ~is_current
     return current_class_mask, old_batch_mask
 
-@st.cache_data(ttl=1800)
-def get_subject_parse_cache(df: pd.DataFrame, subject_cols: tuple, session_id: str):
+@st.cache_data(ttl=CACHE_TTL)
+def get_subject_parse_cache(df: pd.DataFrame, subject_cols: tuple, session_id: str) -> dict:
+    """Cache parsed grade, marks, grade-point, and numeric fallback series for each subject."""
+    # session_id is intentionally part of the signature to isolate cache entries per user session.
     grades_by_subject = {}
     marks_by_subject = {}
     grade_points_by_subject = {}
@@ -409,8 +412,9 @@ def get_subject_parse_cache(df: pd.DataFrame, subject_cols: tuple, session_id: s
         "numeric_values": numeric_by_subject,
     }
 
-@st.cache_data(ttl=1800)
-def get_valid_subjects(df: pd.DataFrame, subject_cols: tuple, session_id: str):
+@st.cache_data(ttl=CACHE_TTL)
+def get_valid_subjects(df: pd.DataFrame, subject_cols: tuple, session_id: str) -> tuple:
+    """Cache subject validity checks for the filtered selection using parsed grade/mark data."""
     skip_list = {
         "OVERALL RESULT",
         "SEMETER RESULT",
@@ -430,8 +434,9 @@ def get_valid_subjects(df: pd.DataFrame, subject_cols: tuple, session_id: str):
             valid_subjects.append(subj)
     return tuple(valid_subjects)
 
-@st.cache_data(ttl=1800)
-def get_numeric_metric_series(df: pd.DataFrame, col: str, session_id: str):
+@st.cache_data(ttl=CACHE_TTL)
+def get_numeric_metric_series(df: pd.DataFrame, col: str, session_id: str) -> pd.Series:
+    """Return cached numeric values for a metric column using marks or grade-point fallback."""
     if col not in df.columns:
         return pd.Series(dtype=float)
     series = df[col]
@@ -443,8 +448,9 @@ def get_numeric_metric_series(df: pd.DataFrame, col: str, session_id: str):
         return marks.where(marks.notna(), grade_points)
     return pd.to_numeric(series, errors="coerce")
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=CACHE_TTL)
 def determine_student_status(df: pd.DataFrame, semester_name: str, session_id: str = "") -> pd.DataFrame:
+    """Cache vectorized STATUS and EXAM TIMELINE classification for a semester selection."""
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
@@ -455,11 +461,8 @@ def determine_student_status(df: pd.DataFrame, semester_name: str, session_id: s
     current_class_mask, _ = get_class_masks(df)
 
     sem_result = df.get("SEMESTER RESULT", pd.Series("", index=df.index)).astype(str).str.upper()
-    has_ygpa = (
-        df.get("YGPA", pd.Series(index=df.index, dtype=object))
-        .notna()
-        & df.get("YGPA", pd.Series(index=df.index, dtype=object)).astype(str).str.strip().ne("")
-    )
+    ygpa_series = df.get("YGPA", pd.Series(index=df.index, dtype=object))
+    has_ygpa = ygpa_series.notna() & ygpa_series.astype(str).str.strip().ne("")
     pass_mask = sem_result.str.contains("PASS", na=False)
     year_lag_mask = is_even_sem & (~has_ygpa) & (~pass_mask)
     old_batch_mask = ~current_class_mask
@@ -493,14 +496,14 @@ def determine_student_status(df: pd.DataFrame, semester_name: str, session_id: s
     )
     return df
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=CACHE_TTL)
 def calculate_subject_stats(
     df: pd.DataFrame,
     subject_cols: tuple,
     session_id: str = "",
-    parsed_subject_cache=None,
 ) -> pd.DataFrame:
-    parsed_cache = parsed_subject_cache or get_subject_parse_cache(df, subject_cols, session_id)
+    """Cache per-subject summary stats using reused parsed marks/grade series."""
+    parsed_cache = get_subject_parse_cache(df, subject_cols, session_id)
     stats_list = []
     for subj in subject_cols:
         if subj not in df.columns:
@@ -527,13 +530,14 @@ def calculate_subject_stats(
         stats_list.append(stat_row)
     return pd.DataFrame(stats_list)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=CACHE_TTL)
 def calculate_z_scores(
     df: pd.DataFrame,
     col: str,
     session_id: str = "",
     numeric_series: Optional[pd.Series] = None,
 ) -> pd.DataFrame:
+    """Cache z-score analysis for a metric; accepts precomputed numeric values when available."""
     df_clean = df.copy()
 
     if numeric_series is not None:

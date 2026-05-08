@@ -164,7 +164,7 @@ if data:
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
     filtered_df = prepare_filtered_dataframe(
         course_df,
-        selected_course="",
+        selected_course="",  # course_df is already course/stream filtered upstream
         selected_semester=selected_semester,
         session_id=session_id,
     )
@@ -399,7 +399,7 @@ if data:
                 if _subj_teacher:
                     st.caption(f"👩‍🏫 Teacher: **{_subj_teacher}**")
 
-                grade_points = subject_parse_cache["grade_points"].get(selected_subj, pd.Series(dtype=float)).reindex(filtered_df.index)
+                grade_points = subject_parse_cache["grade_points"].get(selected_subj, pd.Series(dtype=float))
                 full_subj = pd.to_numeric(grade_points.reindex(display_df.index), errors='coerce')
                 if not exclude_old_batch:
                     reg_subj = pd.to_numeric(grade_points[current_class_mask], errors='coerce')
@@ -433,6 +433,8 @@ if data:
                 precomputed_numeric = None
                 if target_col in subject_parse_cache["numeric_values"]:
                     precomputed_numeric = subject_parse_cache["numeric_values"][target_col].reindex(display_df.index)
+                elif target_col in valid_gpa_cols:
+                    precomputed_numeric = get_numeric_metric_series(display_df, target_col, session_id).reindex(display_df.index)
                 z_df = calculate_z_scores(display_df, target_col, session_id=session_id, numeric_series=precomputed_numeric)
                 if not z_df.empty:
                     st.write("**Filter Learners by Performance Category:**")

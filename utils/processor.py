@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 from utils.constants import REQUIRED_COLUMNS, KNOWN_NON_SUBJECT_COLUMNS, PASSING_GRADES
 
+CACHE_TTL = 1800
+
 @st.cache_data
 def get_sample_template_csv() -> bytes:
     sample = pd.DataFrame({
@@ -281,6 +283,7 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
     return combined_df
 
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
+    session_id = get_or_create_session_id()
     courses = sorted(df["COURSENAME"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
     selected_course = st.selectbox(course_label, courses, key=course_key)
     selected_stream = ""
@@ -302,7 +305,7 @@ def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key:
         df,
         selected_course=selected_course,
         selected_semester="",
-        session_id=get_or_create_session_id(),
+        session_id=session_id,
         stream_col=stream_col or "",
         selected_stream=selected_stream,
     )
@@ -345,12 +348,13 @@ def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
     df = fix_truncated_suffixes(df)
     return df, subject_cols
 def get_or_create_session_id() -> str:
-    # Streamlit cannot reliably detect tab close; use a per-session salt for cache isolation.
+    """Return a stable per-session UUID used to isolate Streamlit cache entries."""
+    # Streamlit cache is process-level; this salt keeps user/session cache keys isolated.
     if "_session_id" not in st.session_state:
         st.session_state["_session_id"] = str(uuid4())
     return st.session_state["_session_id"]
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=CACHE_TTL)
 def prepare_filtered_dataframe(
     df: pd.DataFrame,
     selected_course: str = "",
@@ -359,6 +363,7 @@ def prepare_filtered_dataframe(
     stream_col: str = "",
     selected_stream: str = "",
 ) -> pd.DataFrame:
+    """Filter by course/stream/semester; empty selector values skip that filter."""
     filtered = df.copy()
     if selected_course and "COURSENAME" in filtered.columns:
         filtered = filtered[filtered["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
