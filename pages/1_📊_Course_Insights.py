@@ -11,7 +11,7 @@ from utils.processor import (
     cached_filter_semester_df,
     cached_detect_valid_subjects,
     cached_parse_subject_columns,
-    get_session_cache_salt,
+    get_or_create_session_id,
 )
 from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer
@@ -159,7 +159,7 @@ if data:
 
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
-    session_id = get_session_cache_salt()
+    session_id = get_or_create_session_id()
     filtered_df = cached_filter_semester_df(course_df, selected_semester, session_id)
     
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
@@ -192,7 +192,7 @@ if data:
         skip_list,
         session_id,
     )
-    parsed_grade_df, parsed_marks_df, parsed_z_numeric_df = cached_parse_subject_columns(
+    parsed_grades_df, parsed_marks_df, parsed_z_numeric_df = cached_parse_subject_columns(
         filtered_df,
         tuple(valid_subjects),
         session_id,
@@ -208,7 +208,7 @@ if data:
         for subj in valid_subjects
     }
 
-    filtered_df = determine_student_status(filtered_df, selected_semester, session_id)
+    filtered_df = determine_student_status(filtered_df, selected_semester, session_id=session_id)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
     # --- CALCULATE PASS PERCENTAGES & CORE METRICS ---
@@ -220,16 +220,13 @@ if data:
     current_pass_pct = (current_pass / total_current * 100) if total_current > 0 else 0
     old_batch_count = len(filtered_df[filtered_df["STATUS"] == "Old Batch (Re-appearing)"])
 
-    # --- PRE-GENERATE FIGURES FOR UI & PDF ---
-    status_fig = plot_status_bars(filtered_df["STATUS"].value_counts(), total_students)
     lateral_mask = get_lateral_mask(filtered_df)
-    overview_fig = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
     stats_df = calculate_subject_stats(
         filtered_df,
         valid_subjects,
-        parsed_grades_df=parsed_grade_df,
+        session_id=session_id,
+        parsed_grades_df=parsed_grades_df,
         parsed_marks_df=parsed_marks_df,
-        _session_id=session_id,
     )
 
     # 🧮 DYNAMICALLY INJECT PASS PERCENTAGE INTO THE TABLE
@@ -292,7 +289,9 @@ if data:
         
         st.divider()
 
-        st.pyplot(overview_fig, width="content")
+        overview_fig_tab = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
+        st.pyplot(overview_fig_tab, width="content")
+        plt.close(overview_fig_tab)
 
         st.divider()
 
@@ -399,8 +398,8 @@ if data:
                     is_grade_scale=False,
                 )
                 st.pyplot(gpa_bucket_fig, width='stretch')
-                st.pyplot(gpa_curve_fig, width='stretch')
                 plt.close(gpa_bucket_fig)
+                st.pyplot(gpa_curve_fig, width='stretch')
                 plt.close(gpa_curve_fig)
 
         with col_subj:
@@ -415,11 +414,11 @@ if data:
                 if _subj_teacher:
                     st.caption(f"👩‍🏫 Teacher: **{_subj_teacher}**")
 
-                full_grades = parsed_grade_df.loc[display_df.index, selected_subj]
+                full_grades = parsed_grades_df[selected_subj].reindex(display_df.index)
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
                 # print(full_subj)
                 if not exclude_old_batch:
-                    reg_grades = parsed_grade_df.loc[filtered_df[current_class_mask].index, selected_subj]
+                    reg_grades = parsed_grades_df[selected_subj].reindex(filtered_df[current_class_mask].index)
                     reg_subj = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
                 else:
                     reg_subj = None
@@ -450,8 +449,8 @@ if data:
             try:
                 precomputed_numeric = None
                 if target_col in parsed_z_numeric_df.columns:
-                    precomputed_numeric = parsed_z_numeric_df.loc[display_df.index, target_col]
-                z_df = calculate_z_scores(display_df, target_col, precomputed_numeric=precomputed_numeric, _session_id=session_id)
+                    precomputed_numeric = parsed_z_numeric_df[target_col].reindex(display_df.index)
+                z_df = calculate_z_scores(display_df, target_col, session_id=session_id, precomputed_numeric=precomputed_numeric)
                 if not z_df.empty:
                     st.write("**Filter Learners by Performance Category:**")
                     with st.expander("💡 What is Z-Score Analysis & Why does it matter?"):
@@ -528,11 +527,11 @@ if data:
                     exclude_old_batch_state = exclude_old_batch 
                     
                     for subj in valid_subjects:
-                        full_grades = parsed_grade_df[subj]
+                        full_grades = parsed_grades_df[subj].reindex(filtered_df.index)
                         full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
 
                         if not exclude_old_batch_state:
-                            reg_grades = parsed_grade_df.loc[filtered_df[current_class_mask].index, subj]
+                            reg_grades = parsed_grades_df[subj].reindex(filtered_df[current_class_mask].index)
                             reg_subj_num = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
                         else:
                             reg_subj_num = None
@@ -622,6 +621,8 @@ if data:
                             exam_session_str = str(mode_val.iloc[0])
 
                     # 3. Update the create_master_report_pdf call
+                    status_fig_pdf = plot_status_bars(filtered_df["STATUS"].value_counts(), total_students)
+                    overview_fig_pdf = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
                     pdf_bytes = create_master_report_pdf(
                         college_name=COLLEGE_NAME,
                         course_name=course_name_string,
@@ -629,13 +630,13 @@ if data:
                         year_name=year_name_str,       # New parameter
                         exam_session=exam_session_str, # New parameter
                         summary_table=summary,
-                        status_fig=status_fig, 
+                        status_fig=status_fig_pdf, 
                         subject_stats_df=stats_df, 
                         gpa_curve_figs=all_gpa_figs, 
                         subject_curve_figs=all_subject_figs, 
                         z_score_df=z_summary_df, 
                         comparison_fig=saved_comp_fig if include_comp else None,
-                        overview_fig=overview_fig,
+                        overview_fig=overview_fig_pdf,
                         batch_overview_data=batch_overview_data,
                         logo_path=logo_path,
                         stat_grade_figs=all_stat_grade_figs if include_stat_visuals else None,
@@ -660,6 +661,8 @@ if data:
                         plt.close(subject_grade_bars_fig)
                     if subject_metric_comp_fig is not None:
                         plt.close(subject_metric_comp_fig)
+                    plt.close(status_fig_pdf)
+                    plt.close(overview_fig_pdf)
                     
                     st.download_button(
                         label="Download Full Report",
@@ -669,7 +672,5 @@ if data:
                     )
                 except Exception as e:
                     st.error(f"Error generating PDF. Details: {e}")
-    plt.close(status_fig)
-    plt.close(overview_fig)
 
 render_footer()

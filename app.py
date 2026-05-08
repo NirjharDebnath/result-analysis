@@ -7,7 +7,7 @@ from utils.processor import (
     validate_dataset,
     get_sample_template_csv,
     render_clear_session_button,
-    get_session_cache_salt,
+    get_or_create_session_id,
 )
 from utils.subjects import (
     SUBJECT_CODE_COLUMN,
@@ -139,7 +139,7 @@ st.markdown(f"""
 
 render_sidebar_branding()
 render_clear_session_button()
-get_session_cache_salt()
+get_or_create_session_id()
 subject_mapping = get_subject_mapping()
 format_subject = subject_label_formatter(subject_mapping)
 

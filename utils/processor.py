@@ -24,21 +24,29 @@ def get_sample_template_csv() -> bytes:
     return sample.to_csv(index=False).encode("utf-8")
 
 
-def get_session_cache_salt() -> str:
-    # Streamlit cannot reliably detect tab-close events; use per-session salt + TTL-based cache expiry.
+def get_or_create_session_id() -> str:
+    # Streamlit cannot reliably detect tab-close events; use a per-session cache key + TTL-based expiry.
     if "session_id" not in st.session_state:
         st.session_state["session_id"] = str(uuid4())
-    return str(st.session_state["session_id"])
+    return st.session_state["session_id"]
 
 
 def clear_uploaded_data_and_reset_session() -> None:
-    st.session_state.clear()
-    st.cache_data.clear()
+    keys_to_remove = {
+        "validated_df",
+        "subject_cols",
+        "comparison_fig",
+    }
+    dynamic_prefixes = ("teacher_input_", "exam_month_", "exam_year_")
+    for key in list(st.session_state.keys()):
+        if key in keys_to_remove or key.startswith(dynamic_prefixes):
+            st.session_state.pop(key, None)
+    st.session_state["session_id"] = str(uuid4())
     st.rerun()
 
 
 def render_clear_session_button() -> None:
-    if st.sidebar.button("Clear uploaded data / reset session", key="clear_uploaded_data_reset"):
+    if st.sidebar.button("Clear uploaded data and reset session", key="clear_uploaded_data_reset"):
         clear_uploaded_data_and_reset_session()
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -305,8 +313,9 @@ def cached_filter_course_stream_df(
     selected_course: str,
     stream_col: Optional[str],
     selected_stream: Optional[str],
-    _session_id: str,
+    session_id: str,
 ) -> pd.DataFrame:
+    # session_id is intentionally part of the cache key to isolate user data by session.
     filtered = df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
     if stream_col and selected_stream and stream_col in filtered.columns:
         filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
@@ -314,7 +323,8 @@ def cached_filter_course_stream_df(
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def cached_filter_semester_df(course_df: pd.DataFrame, selected_semester: str, _session_id: str) -> pd.DataFrame:
+def cached_filter_semester_df(course_df: pd.DataFrame, selected_semester: str, session_id: str) -> pd.DataFrame:
+    # session_id is intentionally part of the cache key to isolate user data by session.
     return course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
 
 
@@ -322,8 +332,9 @@ def cached_filter_semester_df(course_df: pd.DataFrame, selected_semester: str, _
 def cached_parse_subject_columns(
     filtered_df: pd.DataFrame,
     subject_cols: Tuple[str, ...],
-    _session_id: str,
+    session_id: str,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # session_id is intentionally part of the cache key to isolate user data by session.
     grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
     grade_data: Dict[str, pd.Series] = {}
     marks_data: Dict[str, pd.Series] = {}
@@ -351,9 +362,10 @@ def cached_detect_valid_subjects(
     filtered_df: pd.DataFrame,
     all_subject_cols: Tuple[str, ...],
     skip_list: Tuple[str, ...],
-    _session_id: str,
+    session_id: str,
 ) -> List[str]:
-    grade_df, marks_df, _ = cached_parse_subject_columns(filtered_df, all_subject_cols, _session_id)
+    # session_id is intentionally part of the cache key to isolate user data by session.
+    grade_df, marks_df, _ = cached_parse_subject_columns(filtered_df, all_subject_cols, session_id)
     skip_set = {str(item).upper().strip() for item in skip_list}
     valid_subjects: List[str] = []
     for subj in all_subject_cols:
@@ -366,7 +378,7 @@ def cached_detect_valid_subjects(
     return valid_subjects
 
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
-    session_id = get_session_cache_salt()
+    session_id = get_or_create_session_id()
     courses = sorted(df["COURSENAME"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
     selected_course = st.selectbox(course_label, courses, key=course_key)
     filtered = cached_filter_course_stream_df(df, selected_course, None, None, session_id)
@@ -411,7 +423,7 @@ def fix_truncated_suffixes(df, column="COURSENAME"):
 
 def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
     render_clear_session_button()
-    get_session_cache_salt()
+    get_or_create_session_id()
     df = st.session_state.get("validated_df")
     subject_cols = st.session_state.get("subject_cols")
     if df is None or subject_cols is None:

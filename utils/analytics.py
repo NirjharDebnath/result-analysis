@@ -385,7 +385,7 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     return current_class_mask, old_batch_mask
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def determine_student_status(df: pd.DataFrame, semester_name: str, _session_id: str = "") -> pd.DataFrame:
+def determine_student_status(df: pd.DataFrame, semester_name: str, session_id: str) -> pd.DataFrame:
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
@@ -400,7 +400,7 @@ def determine_student_status(df: pd.DataFrame, semester_name: str, _session_id: 
     has_ygpa = ygpa_series.notna() & ygpa_series.astype(str).str.strip().ne("")
     has_pass = sem_result.str.contains("PASS", na=False)
 
-    is_year_lag = bool(is_even_sem) & (~has_ygpa) & (~has_pass)
+    is_year_lag = is_even_sem & (~has_ygpa) & (~has_pass)
     conditions = [
         is_year_lag,
         ~current_class_mask,
@@ -417,7 +417,7 @@ def determine_student_status(df: pd.DataFrame, semester_name: str, _session_id: 
     admission_year = df.get("ROLL NO", pd.Series(index=df.index)).apply(infer_academic_year_from_roll)
     admission_year_numeric = pd.to_numeric(admission_year, errors="coerce")
     elapsed_years = exam_year - admission_year_numeric
-    timeline = pd.Series("Unknown", index=df.index, dtype=object)
+    timeline = pd.Series("Unknown", index=df.index)
 
     if expected_elapsed_years is not None:
         valid_elapsed = elapsed_years.notna() & (elapsed_years >= 0)
@@ -432,9 +432,9 @@ def determine_student_status(df: pd.DataFrame, semester_name: str, _session_id: 
 def calculate_subject_stats(
     df: pd.DataFrame,
     subject_cols: list,
+    session_id: str,
     parsed_grades_df: Optional[pd.DataFrame] = None,
     parsed_marks_df: Optional[pd.DataFrame] = None,
-    _session_id: str = "",
 ) -> pd.DataFrame:
     stats_list = []
     for subj in subject_cols:
@@ -474,8 +474,8 @@ def calculate_subject_stats(
 def calculate_z_scores(
     df: pd.DataFrame,
     col: str,
+    session_id: str,
     precomputed_numeric: Optional[pd.Series] = None,
-    _session_id: str = "",
 ) -> pd.DataFrame:
     df_clean = df.copy()
     
