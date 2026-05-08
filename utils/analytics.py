@@ -4,6 +4,7 @@ import numpy as np
 import re
 from typing import List, Optional
 from scipy.stats import skew
+import streamlit as st
 from utils.processor import parse_grade_value, normalize_token
 
 SEMESTER_WORD_TO_NUM = {
@@ -383,7 +384,8 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     old_batch_mask.loc[parsed.index] = ~is_current
     return current_class_mask, old_batch_mask
 
-def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFrame:
+@st.cache_data(ttl=1800, show_spinner=False)
+def determine_student_status(df: pd.DataFrame, semester_name: str, _session_id: str = "") -> pd.DataFrame:
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
@@ -392,59 +394,67 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
     expected_elapsed_years = max(0, (semester_order - 1) // 2) if semester_order != 999 else None
     
     current_class_mask, _ = get_class_masks(df)
-    
-    statuses = []
-    timeline_statuses = []
-    for idx, row in df.iterrows():
-        sem_result = str(row.get("SEMESTER RESULT", "")).upper()
-        has_ygpa = pd.notna(row.get("YGPA")) and str(row.get("YGPA")).strip() != ""
-        
-        # 1. Year Lag check
-        if is_even_sem and not has_ygpa and "PASS" not in sem_result:
-            statuses.append("Year Lag")
-        # 2. Old Batch check (If they aren't current class, they are old batch backlogs)
-        elif not current_class_mask[idx]:
-            statuses.append("Old Batch (Re-appearing)")
-        # 3. Current Batch Pass
-        elif "PASS" in sem_result:
-            statuses.append("Current Batch")
-        # 4. Current Batch Fail/Backlog
-        else:
-            statuses.append("Backlog (Current Batch)")
 
-        exam_year = pd.to_numeric(row.get("EXAM YEAR"), errors="coerce")
-        admission_year = infer_academic_year_from_roll(row.get("ROLL NO"))
-        if pd.isna(exam_year) or admission_year is None or expected_elapsed_years is None:
-            timeline_statuses.append("Unknown")
-        else:
-            elapsed_years = exam_year - admission_year
-            if elapsed_years < 0:
-                timeline_statuses.append("Unknown")
-            # expected_elapsed_years is the normal admission-to-exam gap for the selected semester.
-            # same/less => current cohort, +1 => older (past year), beyond +1 => reappearing backlog.
-            elif elapsed_years <= expected_elapsed_years:
-                timeline_statuses.append("Current Year Students")
-            elif elapsed_years == expected_elapsed_years + 1:
-                timeline_statuses.append("Past Year Students")
-            else:
-                timeline_statuses.append("Reappearing Students")
-            
-    df["STATUS"] = statuses
-    df["EXAM TIMELINE"] = timeline_statuses
+    sem_result = df.get("SEMESTER RESULT", pd.Series("", index=df.index)).astype(str).str.upper()
+    ygpa_series = df.get("YGPA", pd.Series(index=df.index, dtype=object))
+    has_ygpa = ygpa_series.notna() & ygpa_series.astype(str).str.strip().ne("")
+    has_pass = sem_result.str.contains("PASS", na=False)
+
+    is_year_lag = bool(is_even_sem) & (~has_ygpa) & (~has_pass)
+    conditions = [
+        is_year_lag,
+        ~current_class_mask,
+        has_pass,
+    ]
+    choices = [
+        "Year Lag",
+        "Old Batch (Re-appearing)",
+        "Current Batch",
+    ]
+    df["STATUS"] = np.select(conditions, choices, default="Backlog (Current Batch)")
+
+    exam_year = pd.to_numeric(df.get("EXAM YEAR", pd.Series(index=df.index)), errors="coerce")
+    admission_year = df.get("ROLL NO", pd.Series(index=df.index)).apply(infer_academic_year_from_roll)
+    admission_year_numeric = pd.to_numeric(admission_year, errors="coerce")
+    elapsed_years = exam_year - admission_year_numeric
+    timeline = pd.Series("Unknown", index=df.index, dtype=object)
+
+    if expected_elapsed_years is not None:
+        valid_elapsed = elapsed_years.notna() & (elapsed_years >= 0)
+        timeline.loc[valid_elapsed & (elapsed_years <= expected_elapsed_years)] = "Current Year Students"
+        timeline.loc[valid_elapsed & (elapsed_years == expected_elapsed_years + 1)] = "Past Year Students"
+        timeline.loc[valid_elapsed & (elapsed_years > expected_elapsed_years + 1)] = "Reappearing Students"
+
+    df["EXAM TIMELINE"] = timeline
     return df
 
-def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFrame:
+@st.cache_data(ttl=1800, show_spinner=False)
+def calculate_subject_stats(
+    df: pd.DataFrame,
+    subject_cols: list,
+    parsed_grades_df: Optional[pd.DataFrame] = None,
+    parsed_marks_df: Optional[pd.DataFrame] = None,
+    _session_id: str = "",
+) -> pd.DataFrame:
     stats_list = []
     for subj in subject_cols:
-        if subj not in df.columns: continue
-            
-        parsed = df[subj].apply(parse_grade_value)
-        grades = [p[0] for p in parsed if p[0] is not None]
-        marks = [p[1] for p in parsed if p[1] is not None]
-        
-        if not marks: continue
-        marks_series = pd.Series(marks).dropna()
-        grade_counts = pd.Series(grades).value_counts().to_dict()
+        if subj not in df.columns:
+            continue
+
+        if parsed_grades_df is not None and subj in parsed_grades_df.columns:
+            grade_series = parsed_grades_df[subj]
+        else:
+            grade_series = df[subj].apply(lambda x: parse_grade_value(x)[0])
+
+        if parsed_marks_df is not None and subj in parsed_marks_df.columns:
+            marks_series = pd.to_numeric(parsed_marks_df[subj], errors="coerce").dropna()
+        else:
+            marks_series = pd.to_numeric(df[subj].apply(lambda x: parse_grade_value(x)[1]), errors="coerce").dropna()
+
+        if marks_series.empty:
+            continue
+
+        grade_counts = grade_series.dropna().value_counts().to_dict()
         
         stat_row = {
             "Subject": subj,
@@ -460,7 +470,13 @@ def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFram
         stats_list.append(stat_row)
     return pd.DataFrame(stats_list)
 
-def calculate_z_scores(df: pd.DataFrame, col: str) -> pd.DataFrame:
+@st.cache_data(ttl=1800, show_spinner=False)
+def calculate_z_scores(
+    df: pd.DataFrame,
+    col: str,
+    precomputed_numeric: Optional[pd.Series] = None,
+    _session_id: str = "",
+) -> pd.DataFrame:
     df_clean = df.copy()
     
     def extract_numeric(val):
@@ -478,7 +494,9 @@ def calculate_z_scores(df: pd.DataFrame, col: str) -> pd.DataFrame:
         # 3. If it's empty, absent, or "---", return None
         return None
 
-    if df_clean[col].dtype == 'object':
+    if precomputed_numeric is not None:
+        df_clean['NUMERIC_VAL'] = pd.to_numeric(precomputed_numeric.reindex(df_clean.index), errors='coerce')
+    elif df_clean[col].dtype == 'object':
         df_clean['NUMERIC_VAL'] = df_clean[col].apply(extract_numeric)
     else:
         df_clean['NUMERIC_VAL'] = pd.to_numeric(df_clean[col], errors='coerce')

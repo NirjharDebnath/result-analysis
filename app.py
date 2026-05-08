@@ -2,7 +2,13 @@
 import streamlit as st
 from datetime import datetime, timezone
 from utils.constants import COLLEGE_NAME, SOFT_COLORS, UI_THEME
-from utils.processor import read_uploaded_datasets, validate_dataset, get_sample_template_csv
+from utils.processor import (
+    read_uploaded_datasets,
+    validate_dataset,
+    get_sample_template_csv,
+    render_clear_session_button,
+    get_session_cache_salt,
+)
 from utils.subjects import (
     SUBJECT_CODE_COLUMN,
     SUBJECT_NAME_COLUMN,
@@ -132,6 +138,8 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 render_sidebar_branding()
+render_clear_session_button()
+get_session_cache_salt()
 subject_mapping = get_subject_mapping()
 format_subject = subject_label_formatter(subject_mapping)
 
