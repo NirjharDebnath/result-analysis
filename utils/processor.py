@@ -1,6 +1,7 @@
 # utils/processor.py
 import re
 from typing import Dict, List, Optional, Tuple
+from uuid import uuid4
 import pandas as pd
 import streamlit as st
 from utils.constants import REQUIRED_COLUMNS, KNOWN_NON_SUBJECT_COLUMNS, PASSING_GRADES
@@ -21,6 +22,32 @@ def get_sample_template_csv() -> bytes:
         "TOTAL MAR POINTS": ["0"],
     })
     return sample.to_csv(index=False).encode("utf-8")
+
+
+def get_or_create_session_id() -> str:
+    # Streamlit cannot reliably detect tab-close events; use a per-session cache key + TTL-based expiry.
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = str(uuid4())
+    return st.session_state["session_id"]
+
+
+def clear_uploaded_data_and_reset_session() -> None:
+    keys_to_remove = {
+        "validated_df",
+        "subject_cols",
+        "comparison_fig",
+    }
+    dynamic_prefixes = ("teacher_input_", "exam_month_", "exam_year_")
+    for key in list(st.session_state.keys()):
+        if key in keys_to_remove or key.startswith(dynamic_prefixes):
+            st.session_state.pop(key, None)
+    st.session_state["session_id"] = str(uuid4())
+    st.rerun()
+
+
+def render_clear_session_button() -> None:
+    if st.sidebar.button("Clear uploaded data and reset session", key="clear_uploaded_data_reset"):
+        clear_uploaded_data_and_reset_session()
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -279,17 +306,89 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
     combined_df.attrs["dropped_duplicate_rows"] = duplicate_count
     return combined_df
 
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cached_filter_course_stream_df(
+    df: pd.DataFrame,
+    selected_course: str,
+    stream_col: Optional[str],
+    selected_stream: Optional[str],
+    session_id: str,
+) -> pd.DataFrame:
+    # session_id is intentionally part of the cache key to isolate user data by session.
+    filtered = df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
+    if stream_col and selected_stream and stream_col in filtered.columns:
+        filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
+    return filtered
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cached_filter_semester_df(course_df: pd.DataFrame, selected_semester: str, session_id: str) -> pd.DataFrame:
+    # session_id is intentionally part of the cache key to isolate user data by session.
+    return course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cached_parse_subject_columns(
+    filtered_df: pd.DataFrame,
+    subject_cols: Tuple[str, ...],
+    session_id: str,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # session_id is intentionally part of the cache key to isolate user data by session.
+    grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
+    grade_data: Dict[str, pd.Series] = {}
+    marks_data: Dict[str, pd.Series] = {}
+    z_numeric_data: Dict[str, pd.Series] = {}
+
+    for subj in subject_cols:
+        if subj not in filtered_df.columns:
+            continue
+        parsed = filtered_df[subj].apply(parse_grade_value)
+        grades = parsed.apply(lambda x: x[0])
+        marks = pd.to_numeric(parsed.apply(lambda x: x[1]), errors="coerce")
+        z_numeric = marks.fillna(pd.to_numeric(grades.map(grade_to_point), errors="coerce"))
+        grade_data[subj] = grades
+        marks_data[subj] = marks
+        z_numeric_data[subj] = z_numeric
+
+    grade_df = pd.DataFrame(grade_data, index=filtered_df.index)
+    marks_df = pd.DataFrame(marks_data, index=filtered_df.index)
+    z_numeric_df = pd.DataFrame(z_numeric_data, index=filtered_df.index)
+    return grade_df, marks_df, z_numeric_df
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cached_detect_valid_subjects(
+    filtered_df: pd.DataFrame,
+    all_subject_cols: Tuple[str, ...],
+    skip_list: Tuple[str, ...],
+    session_id: str,
+) -> List[str]:
+    # session_id is intentionally part of the cache key to isolate user data by session.
+    grade_df, marks_df, _ = cached_parse_subject_columns(filtered_df, all_subject_cols, session_id)
+    skip_set = {str(item).upper().strip() for item in skip_list}
+    valid_subjects: List[str] = []
+    for subj in all_subject_cols:
+        if subj not in filtered_df.columns or str(subj).upper().strip() in skip_set:
+            continue
+        has_grade = subj in grade_df.columns and grade_df[subj].notna().any()
+        has_marks = subj in marks_df.columns and marks_df[subj].notna().any()
+        if has_grade or has_marks:
+            valid_subjects.append(subj)
+    return valid_subjects
+
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
+    session_id = get_or_create_session_id()
     courses = sorted(df["COURSENAME"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
     selected_course = st.selectbox(course_label, courses, key=course_key)
-    filtered = df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
+    filtered = cached_filter_course_stream_df(df, selected_course, None, None, session_id)
     
     stream_col = next((c for c in ["STREAM", "BRANCH", "SPECIALIZATION"] if c in filtered.columns), None)
     if stream_col:
         stream_options = sorted(filtered[stream_col].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
         if stream_options:
             selected_stream = st.selectbox(f"Select {stream_col.title()}", stream_options, key=f"{course_key}_stream")
-            filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
+            filtered = cached_filter_course_stream_df(df, selected_course, stream_col, selected_stream, session_id)
 
     return filtered
 
@@ -323,6 +422,8 @@ def fix_truncated_suffixes(df, column="COURSENAME"):
     return df
 
 def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
+    render_clear_session_button()
+    get_or_create_session_id()
     df = st.session_state.get("validated_df")
     subject_cols = st.session_state.get("subject_cols")
     if df is None or subject_cols is None:
