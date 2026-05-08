@@ -42,6 +42,8 @@ def create_master_report_pdf(
     stat_metric_fig=None,
     stat_grade_figs=None,
     stat_metric_figs=None,
+    teacher_names=None,
+    subject_codes=None,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -108,11 +110,19 @@ def create_master_report_pdf(
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 10, "Subject Performance Statistics", ln=True)
     pdf.ln(5)
-    
-    # REBALANCED COLUMN WIDTHS TO FIT "Pass %" perfectly on the page
-    pdf.set_font("Arial", "B", 8)
-    headers = ["Subject", "Mean", "Med", "SD", "Skew", "Pass %", "O", "E", "A", "B", "C", "D", "F"]
-    col_widths = [54, 11, 11, 11, 11, 14, 11, 11, 11, 11, 11, 11, 12] # Exactly 190mm total width
+
+    # Determine whether to include a Teacher column
+    has_teachers = bool(teacher_names and any(teacher_names.values()))
+    if has_teachers:
+        # Widths sum to 190mm; Subject narrowed to 38, Teacher at 22
+        pdf.set_font("Arial", "B", 8)
+        headers = ["Subject", "Teacher", "Mean", "Med", "SD", "Skew", "Pass %", "O", "E", "A", "B", "C", "D", "F"]
+        col_widths = [38, 22, 11, 11, 11, 11, 14, 9, 9, 9, 9, 9, 9, 9]  # 190mm total
+    else:
+        # REBALANCED COLUMN WIDTHS TO FIT "Pass %" perfectly on the page
+        pdf.set_font("Arial", "B", 8)
+        headers = ["Subject", "Mean", "Med", "SD", "Skew", "Pass %", "O", "E", "A", "B", "C", "D", "F"]
+        col_widths = [54, 11, 11, 11, 11, 14, 11, 11, 11, 11, 11, 11, 12]  # Exactly 190mm total width
     
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 8, clean_text(h), border=1, align="C")
@@ -120,20 +130,37 @@ def create_master_report_pdf(
     
     pdf.set_font("Arial", "", 7)
     for _, row in subject_stats_df.iterrows():
-        # Truncate subject string slightly to fit the new 54mm width
-        pdf.cell(54, 7, clean_text(str(row["Subject"])[:38]), border=1)
-        pdf.cell(11, 7, clean_text(str(row.get("Mean", ""))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(row.get("Median", ""))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(row.get("Std Dev (\u03c3)", ""))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(row.get("Skewness", ""))), border=1, align="C")
-        pdf.cell(14, 7, clean_text(str(row.get("Pass %", ""))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("O", 0)))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("E", 0)))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("A", 0)))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("B", 0)))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("C", 0)))), border=1, align="C")
-        pdf.cell(11, 7, clean_text(str(int(row.get("D", 0)))), border=1, align="C")
-        pdf.cell(12, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
+        if has_teachers:
+            pdf.cell(38, 7, clean_text(str(row["Subject"])[:28]), border=1)
+            _teacher_val = clean_text(str(row.get("Teacher", ""))[:18])
+            pdf.cell(22, 7, _teacher_val, border=1)
+            pdf.cell(11, 7, clean_text(str(row.get("Mean", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Median", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Std Dev (\u03c3)", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Skewness", ""))), border=1, align="C")
+            pdf.cell(14, 7, clean_text(str(row.get("Pass %", ""))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("O", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("E", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("A", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("B", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("C", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("D", 0)))), border=1, align="C")
+            pdf.cell(9, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
+        else:
+            # Truncate subject string slightly to fit the new 54mm width
+            pdf.cell(54, 7, clean_text(str(row["Subject"])[:38]), border=1)
+            pdf.cell(11, 7, clean_text(str(row.get("Mean", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Median", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Std Dev (\u03c3)", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(row.get("Skewness", ""))), border=1, align="C")
+            pdf.cell(14, 7, clean_text(str(row.get("Pass %", ""))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("O", 0)))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("E", 0)))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("A", 0)))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("B", 0)))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("C", 0)))), border=1, align="C")
+            pdf.cell(11, 7, clean_text(str(int(row.get("D", 0)))), border=1, align="C")
+            pdf.cell(12, 7, clean_text(str(int(row.get("F", 0)))), border=1, align="C")
         pdf.ln()
 
     combined_grade_figs = list(stat_grade_figs or [])
@@ -244,8 +271,18 @@ def create_master_report_pdf(
         pdf.set_font("Arial", "B", 12)
         pdf.cell(190, 10, "Subject Distribution Curves", ln=True)
         pdf.ln(5)
-        
-        for figure_entry in subject_curve_figs:
+
+        # Build a list of (subject_code, teacher_name) parallel to subject_curve_figs
+        subj_teacher_list = []
+        if subject_codes:
+            for subject_code in subject_codes:
+                teacher_name = (teacher_names or {}).get(subject_code, "")
+                subj_teacher_list.append((subject_code, teacher_name))
+        # Pad if needed (shouldn't be necessary in normal flow)
+        while len(subj_teacher_list) < len(subject_curve_figs):
+            subj_teacher_list.append(("", ""))
+
+        for idx, figure_entry in enumerate(subject_curve_figs):
             if isinstance(figure_entry, (list, tuple)):
                 top_fig = figure_entry[0] if len(figure_entry) > 0 else None
                 bottom_fig = figure_entry[1] if len(figure_entry) > 1 else None
@@ -254,6 +291,13 @@ def create_master_report_pdf(
                 bottom_fig = None
             if top_fig is None:
                 continue
+            # Print teacher name label before each subject's pair of charts
+            if idx < len(subj_teacher_list):
+                _, teacher_name = subj_teacher_list[idx]
+                if teacher_name:
+                    pdf.set_font("Arial", "I", 9)
+                    pdf.cell(190, 5, clean_text(f"Teacher: {teacher_name}"), ln=True)
+                    pdf.ln(1)
             _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=110)
 
     # --- Z-Score Table ---
