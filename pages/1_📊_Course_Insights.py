@@ -193,6 +193,12 @@ if data:
         st.warning("No data found for this selection.")
         st.stop()
 
+    # --- TEACHER NAMES: read from session state (populated by the expander below) ---
+    teacher_names = {
+        subj: st.session_state.get(f"teacher_input_{selected_semester}_{subj}", "")
+        for subj in valid_subjects
+    }
+
     filtered_df = determine_student_status(filtered_df, selected_semester)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
@@ -219,6 +225,8 @@ if data:
         stats_df["Pass %"] = pass_pct
 
     if not stats_df.empty and "Subject" in stats_df.columns:
+        if any(teacher_names.values()):
+            stats_df.insert(1, "Teacher", stats_df["Subject"].map(lambda s: teacher_names.get(s, "")))
         stats_df["Subject"] = stats_df["Subject"].apply(format_subject)
 
     gpa_curve_fig = None
@@ -233,6 +241,27 @@ if data:
         col for col in _all_gpa_cols
         if pd.to_numeric(filtered_df[col], errors='coerce').dropna().shape[0] > 0
     ]
+
+    # --- TEACHER NAMES EXPANDER ---
+    with st.expander("👩‍🏫 Subject Teachers", expanded=False):
+        st.caption(
+            "Enter the name of the teacher responsible for each subject. "
+            "Names will appear in the Statistical Matrix, Distribution Curves, and the exported PDF report."
+        )
+        if valid_subjects:
+            cols_per_row = 2
+            for _i in range(0, len(valid_subjects), cols_per_row):
+                _row_cols = st.columns(cols_per_row)
+                for _j, _subj in enumerate(valid_subjects[_i:_i + cols_per_row]):
+                    with _row_cols[_j]:
+                        st.text_input(
+                            format_subject(_subj),
+                            value=st.session_state.get(f"teacher_input_{selected_semester}_{_subj}", ""),
+                            key=f"teacher_input_{selected_semester}_{_subj}",
+                            placeholder="Enter teacher name…",
+                        )
+        else:
+            st.info("No valid subjects found for the selected semester and course.")
 
     tab1, tab2, tab3, tab4 = st.tabs(["📑 Executive Summary", "🧮 Statistical Matrix", "📈 Distribution Curves", "📥 Export PDF"])
 
@@ -362,6 +391,10 @@ if data:
                     valid_subjects,
                     format_func=format_subject,
                 )
+
+                _subj_teacher = teacher_names.get(selected_subj, "")
+                if _subj_teacher:
+                    st.caption(f"👩‍🏫 Teacher: **{_subj_teacher}**")
 
                 full_grades = display_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
@@ -575,6 +608,8 @@ if data:
                         logo_path=logo_path,
                         stat_grade_figs=all_stat_grade_figs if include_stat_visuals else None,
                         stat_metric_figs=all_stat_metric_figs if include_stat_visuals else None,
+                        teacher_names=teacher_names,
+                        subject_codes=valid_subjects,
                     )
                     
                     for curve_fig, pie_fig in all_subject_figs:
