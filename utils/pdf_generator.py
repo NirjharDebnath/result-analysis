@@ -312,26 +312,50 @@ def create_master_report_pdf(
         pdf.set_font("Arial", "B", 12)
         pdf.cell(190, 10, "Z-Score Analysis Table (Selected Metric)", ln=True)
         pdf.ln(2)
-        
+
+        has_student_type = "STUDENT TYPE" in z_score_df.columns
+
+        if has_student_type:
+            # Widths sum to 190 to preserve page layout.
+            headers = [
+                ("ROLL NO", "Roll No", 24, "L"),
+                ("NAME", "Name", 56, "L"),
+                ("STUDENT TYPE", "Student Type", 36, "L"),
+                ("VALUE", "Value", 18, "C"),
+                ("Z-SCORE", "Z-Score", 18, "C"),
+                ("CATEGORY", "Category", 38, "C"),
+            ]
+        else:
+            headers = [
+                ("ROLL NO", "Roll No", 30, "L"),
+                ("NAME", "Name", 70, "L"),
+                ("VALUE", "Value", 20, "C"),
+                ("Z-SCORE", "Z-Score", 20, "C"),
+                ("CATEGORY", "Category", 50, "C"),
+            ]
+
         pdf.set_font("Arial", "B", 9)
-        pdf.cell(30, 8, "Roll No", border=1)
-        pdf.cell(70, 8, "Name", border=1)
-        pdf.cell(20, 8, "Value", border=1, align="C")
-        pdf.cell(20, 8, "Z-Score", border=1, align="C")
-        pdf.cell(50, 8, "Category", border=1, align="C")
+        for _, label, width, align in headers:
+            pdf.cell(width, 8, label, border=1, align=align)
         pdf.ln()
-        
+
         pdf.set_font("Arial", "", 8)
         for _, row in z_score_df.iterrows():
-            pdf.cell(30, 7, clean_text(str(row.iloc[0])[:15]), border=1)
-            pdf.cell(70, 7, clean_text(str(row.iloc[1])[:35]), border=1)
-            pdf.cell(20, 7, clean_text(str(row.iloc[2])), border=1, align="C")
-            
-            try: z_val = f"{float(row.iloc[3]):.2f}"
-            except: z_val = str(row.iloc[3])
-            pdf.cell(20, 7, clean_text(z_val), border=1, align="C")
-            
-            pdf.cell(50, 7, clean_text(str(row.iloc[4])), border=1, align="C")
+            for key, _, width, align in headers:
+                cell_val = row.get(key, "")
+                if key == "Z-SCORE":
+                    try:
+                        cell_val = f"{float(cell_val):.2f}"
+                    except Exception:
+                        cell_val = str(cell_val)
+                text = clean_text(str(cell_val))
+                if key == "ROLL NO":
+                    text = text[:15]
+                elif key == "NAME":
+                    text = text[:35]
+                elif key == "STUDENT TYPE":
+                    text = text[:24]
+                pdf.cell(width, 7, text, border=1, align=align)
             pdf.ln()
 
     # --- Semester Comparison (Optional) ---
