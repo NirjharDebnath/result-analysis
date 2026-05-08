@@ -2,11 +2,22 @@
 import os
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
 from utils.constants import COLLEGE_NAME, LOGO_CANDIDATE_PATHS, SOFT_COLORS, UI_THEME
-from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, parse_grade_value
+from utils.processor import require_data, apply_course_stream_filters, get_gpa_columns, get_or_create_session_id, prepare_filtered_dataframe
 from utils.subjects import get_subject_mapping, subject_label_formatter
 from utils.visualizer import render_sidebar_branding, render_footer
-from utils.analytics import get_class_masks, determine_student_status, calculate_subject_stats, calculate_z_scores, get_lateral_mask, get_semester_order
+from utils.analytics import (
+    get_class_masks,
+    determine_student_status,
+    calculate_subject_stats,
+    calculate_z_scores,
+    get_lateral_mask,
+    get_semester_order,
+    get_valid_subjects,
+    get_subject_parse_cache,
+    get_numeric_metric_series,
+)
 from utils.charts import (
     plot_status_bars,
     plot_normal_curve,
@@ -143,6 +154,7 @@ data = require_data()
 if data:
     
     df, all_subject_cols = data
+    session_id = get_or_create_session_id()
     subject_mapping = get_subject_mapping()
     format_subject = subject_label_formatter(subject_mapping)
     st.sidebar.header("Data Filters")
@@ -150,7 +162,12 @@ if data:
 
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
     selected_semester = st.sidebar.selectbox("Select Semester", semesters)
-    filtered_df = course_df[course_df["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
+    filtered_df = prepare_filtered_dataframe(
+        course_df,
+        selected_course="",
+        selected_semester=selected_semester,
+        session_id=session_id,
+    )
     
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
@@ -174,20 +191,8 @@ if data:
     if exam_session_str:
         st.caption(f"🗓️ **Exam Conducted:** {exam_session_str}")
 
-    # --- SUBJECT FILTER ---
-    skip_list = ["OVERALL RESULT", "SEMETER RESULT", "SEMESTER RESULT", "TOTAL MAR POINTS", "TOTAL MARK POINTS", "TOTAL MAR \nPOINTS"]
-    valid_subjects = []
-    
-    for c in all_subject_cols:
-        if c in filtered_df.columns and str(c).upper().strip() not in skip_list:
-            has_real_data = False
-            for val in filtered_df[c].dropna():
-                grade, marks = parse_grade_value(val)
-                if grade is not None or marks is not None:
-                    has_real_data = True
-                    break
-            if has_real_data:
-                valid_subjects.append(c)
+    valid_subjects = list(get_valid_subjects(filtered_df, tuple(all_subject_cols), session_id))
+    subject_parse_cache = get_subject_parse_cache(filtered_df, tuple(valid_subjects), session_id)
 
     if filtered_df.empty:
         st.warning("No data found for this selection.")
@@ -199,7 +204,7 @@ if data:
         for subj in valid_subjects
     }
 
-    filtered_df = determine_student_status(filtered_df, selected_semester)
+    filtered_df = determine_student_status(filtered_df, selected_semester, session_id=session_id)
     current_class_mask, old_batch_mask = get_class_masks(filtered_df)
 
     # --- CALCULATE PASS PERCENTAGES & CORE METRICS ---
@@ -212,10 +217,8 @@ if data:
     old_batch_count = len(filtered_df[filtered_df["STATUS"] == "Old Batch (Re-appearing)"])
 
     # --- PRE-GENERATE FIGURES FOR UI & PDF ---
-    status_fig = plot_status_bars(filtered_df["STATUS"].value_counts(), total_students)
     lateral_mask = get_lateral_mask(filtered_df)
-    overview_fig = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
-    stats_df = calculate_subject_stats(filtered_df, valid_subjects)
+    stats_df = calculate_subject_stats(filtered_df, tuple(valid_subjects), session_id=session_id)
 
     # 🧮 DYNAMICALLY INJECT PASS PERCENTAGE INTO THE TABLE
     if not stats_df.empty and all(g in stats_df.columns for g in ['O', 'E', 'A', 'B', 'C', 'D', 'F']):
@@ -229,11 +232,7 @@ if data:
             stats_df.insert(1, "Teacher", stats_df["Subject"].map(lambda s: teacher_names.get(s, "")))
         stats_df["Subject"] = stats_df["Subject"].apply(format_subject)
 
-    gpa_curve_fig = None
-    subject_curve_fig = None
     z_summary_df = pd.DataFrame()
-    subject_grade_bars_fig = None
-    subject_metric_comp_fig = None
 
     # Pre-compute valid GPA columns: only those with actual numeric data for the selected course/semester
     _all_gpa_cols = get_gpa_columns(filtered_df)
@@ -277,7 +276,9 @@ if data:
         
         st.divider()
 
+        overview_fig = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
         st.pyplot(overview_fig, width="content")
+        plt.close(overview_fig)
 
         st.divider()
 
@@ -329,6 +330,7 @@ if data:
                 )
                 subject_grade_bars_fig = plot_subject_grade_distribution_bars(stats_df, selected_subject=selected_grade_subject)
                 st.pyplot(subject_grade_bars_fig, width="stretch")
+                plt.close(subject_grade_bars_fig)
             with stat_right:
                 st.markdown("#### 📈 Comparative Metrics by Subject Code")
                 metric_options = [m for m in ["Mean", "Median", "Std Dev (σ)", "Pass %"] if m in stats_df.columns]
@@ -343,6 +345,7 @@ if data:
                     use_subject_codes=True,
                 )
                 st.pyplot(subject_metric_comp_fig, width="stretch")
+                plt.close(subject_metric_comp_fig)
 
     with tab3:
         st.subheader("Statistical Bell Curves")
@@ -368,13 +371,11 @@ if data:
         selected_gpa = None
         selected_subj = None
 
-        grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
-
         with col_gpa:
             if valid_gpa_cols:
                 selected_gpa = st.selectbox("Select GPA Metric", valid_gpa_cols)
-                full_gpa = pd.to_numeric(filtered_df[selected_gpa], errors='coerce')
-                reg_gpa = pd.to_numeric(filtered_df[current_class_mask][selected_gpa], errors='coerce') if not exclude_old_batch else None
+                full_gpa = get_numeric_metric_series(filtered_df, selected_gpa, session_id).reindex(filtered_df.index)
+                reg_gpa = full_gpa[current_class_mask] if not exclude_old_batch else None
                 gpa_bucket_fig = plot_gpa_bucket_distribution(full_gpa, title=f"{selected_gpa} Distribution")
                 gpa_curve_fig = plot_normal_distribution_stats(
                     reg_gpa if reg_gpa is not None else full_gpa,
@@ -383,6 +384,8 @@ if data:
                 )
                 st.pyplot(gpa_bucket_fig, width='stretch')
                 st.pyplot(gpa_curve_fig, width='stretch')
+                plt.close(gpa_bucket_fig)
+                plt.close(gpa_curve_fig)
 
         with col_subj:
             if valid_subjects:
@@ -396,12 +399,10 @@ if data:
                 if _subj_teacher:
                     st.caption(f"👩‍🏫 Teacher: **{_subj_teacher}**")
 
-                full_grades = display_df[selected_subj].apply(lambda x: parse_grade_value(x)[0])
-                full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
-                # print(full_subj)
+                grade_points = subject_parse_cache["grade_points"].get(selected_subj, pd.Series(dtype=float)).reindex(filtered_df.index)
+                full_subj = pd.to_numeric(grade_points.reindex(display_df.index), errors='coerce')
                 if not exclude_old_batch:
-                    reg_grades = filtered_df[current_class_mask][selected_subj].apply(lambda x: parse_grade_value(x)[0])
-                    reg_subj = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
+                    reg_subj = pd.to_numeric(grade_points[current_class_mask], errors='coerce')
                 else:
                     reg_subj = None
 
@@ -414,6 +415,8 @@ if data:
                 st.pyplot(subject_curve_fig, width='stretch')
                 if subject_pie_fig is not None:
                     st.pyplot(subject_pie_fig, width='stretch')
+                    plt.close(subject_pie_fig)
+                plt.close(subject_curve_fig)
 
         st.divider()
         z_metric_choice = st.radio("Analyze Z-Scores for:", ["Selected Subject", "Selected GPA Metric"], horizontal=True)
@@ -427,7 +430,10 @@ if data:
         if target_col:
             st.markdown(f"#### 🔍 Z-Score Analysis for: **{format_subject(target_col)}**")
             try:
-                z_df = calculate_z_scores(display_df, target_col)
+                precomputed_numeric = None
+                if target_col in subject_parse_cache["numeric_values"]:
+                    precomputed_numeric = subject_parse_cache["numeric_values"][target_col].reindex(display_df.index)
+                z_df = calculate_z_scores(display_df, target_col, session_id=session_id, numeric_series=precomputed_numeric)
                 if not z_df.empty:
                     st.write("**Filter Learners by Performance Category:**")
                     with st.expander("💡 What is Z-Score Analysis & Why does it matter?"):
@@ -498,20 +504,16 @@ if data:
 
         if st.button("Generate Master Report PDF"):
             with st.spinner("Generating graphs for all subjects and building PDF (this might take a few seconds)..."):
-                import matplotlib.pyplot as plt 
-                
                 try:
                     all_subject_figs = []
-                    grade_to_point = {'O':10,'E':9,'A':8,'B':7,'C':6,'D':5,'F':0}
                     exclude_old_batch_state = exclude_old_batch 
                     
                     for subj in valid_subjects:
-                        full_grades = filtered_df[subj].apply(lambda x: parse_grade_value(x)[0])
-                        full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
+                        grade_points = subject_parse_cache["grade_points"].get(subj, pd.Series(dtype=float)).reindex(filtered_df.index)
+                        full_subj_num = pd.to_numeric(grade_points, errors='coerce')
 
                         if not exclude_old_batch_state:
-                            reg_grades = filtered_df[current_class_mask][subj].apply(lambda x: parse_grade_value(x)[0])
-                            reg_subj_num = pd.to_numeric(reg_grades.map(grade_to_point), errors='coerce')
+                            reg_subj_num = pd.to_numeric(grade_points[current_class_mask], errors='coerce')
                         else:
                             reg_subj_num = None
 
@@ -527,8 +529,8 @@ if data:
                     # Generate bell curves for all valid GPA columns
                     all_gpa_figs = []
                     for gpa_col in valid_gpa_cols:
-                        full_gpa_data = pd.to_numeric(filtered_df[gpa_col], errors='coerce')
-                        reg_gpa_data = pd.to_numeric(filtered_df[current_class_mask][gpa_col], errors='coerce') if not exclude_old_batch_state else None
+                        full_gpa_data = get_numeric_metric_series(filtered_df, gpa_col, session_id).reindex(filtered_df.index)
+                        reg_gpa_data = full_gpa_data[current_class_mask] if not exclude_old_batch_state else None
                         gpa_buckets = plot_gpa_bucket_distribution(full_gpa_data, title=f"{gpa_col} Bucket Distribution")
                         gpa_curve = plot_normal_distribution_stats(
                             reg_gpa_data if reg_gpa_data is not None else full_gpa_data,
@@ -600,6 +602,8 @@ if data:
                             exam_session_str = str(mode_val.iloc[0])
 
                     # 3. Update the create_master_report_pdf call
+                    status_fig = plot_status_bars(filtered_df["STATUS"].value_counts(), len(filtered_df))
+                    overview_fig = plot_executive_overview(filtered_df, current_class_mask, lateral_mask)
                     pdf_bytes = create_master_report_pdf(
                         college_name=COLLEGE_NAME,
                         course_name=course_name_string,
@@ -634,10 +638,8 @@ if data:
                         plt.close(fig)
                     for fig in all_stat_metric_figs:
                         plt.close(fig)
-                    if subject_grade_bars_fig is not None:
-                        plt.close(subject_grade_bars_fig)
-                    if subject_metric_comp_fig is not None:
-                        plt.close(subject_metric_comp_fig)
+                    plt.close(status_fig)
+                    plt.close(overview_fig)
                     
                     st.download_button(
                         label="Download Full Report",

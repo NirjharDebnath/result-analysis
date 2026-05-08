@@ -1,5 +1,6 @@
 # utils/processor.py
 import re
+from uuid import uuid4
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import streamlit as st
@@ -282,16 +283,29 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
 def apply_course_stream_filters(df: pd.DataFrame, course_label: str, course_key: str):
     courses = sorted(df["COURSENAME"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
     selected_course = st.selectbox(course_label, courses, key=course_key)
-    filtered = df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
+    selected_stream = ""
     
-    stream_col = next((c for c in ["STREAM", "BRANCH", "SPECIALIZATION"] if c in filtered.columns), None)
+    stream_col = next((c for c in ["STREAM", "BRANCH", "SPECIALIZATION"] if c in df.columns), None)
     if stream_col:
-        stream_options = sorted(filtered[stream_col].dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist())
+        stream_options = sorted(
+            df[df["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()][stream_col]
+            .dropna().astype(str).str.strip().replace("", pd.NA).dropna().unique().tolist()
+        )
         if stream_options:
-            selected_stream = st.selectbox(f"Select {stream_col.title()}", stream_options, key=f"{course_key}_stream")
-            filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
+            selected_stream = st.selectbox(
+                f"Select {stream_col.title()}",
+                stream_options,
+                key=f"{course_key}_stream",
+            )
 
-    return filtered
+    return prepare_filtered_dataframe(
+        df,
+        selected_course=selected_course,
+        selected_semester="",
+        session_id=get_or_create_session_id(),
+        stream_col=stream_col or "",
+        selected_stream=selected_stream,
+    )
 
 def fix_truncated_suffixes(df, column="COURSENAME"):
     target_words = [
@@ -330,3 +344,26 @@ def require_data() -> Optional[Tuple[pd.DataFrame, List[str]]]:
         return None
     df = fix_truncated_suffixes(df)
     return df, subject_cols
+def get_or_create_session_id() -> str:
+    # Streamlit cannot reliably detect tab close; use a per-session salt for cache isolation.
+    if "_session_id" not in st.session_state:
+        st.session_state["_session_id"] = str(uuid4())
+    return st.session_state["_session_id"]
+
+@st.cache_data(ttl=1800)
+def prepare_filtered_dataframe(
+    df: pd.DataFrame,
+    selected_course: str = "",
+    selected_semester: str = "",
+    session_id: str = "",
+    stream_col: str = "",
+    selected_stream: str = "",
+) -> pd.DataFrame:
+    filtered = df.copy()
+    if selected_course and "COURSENAME" in filtered.columns:
+        filtered = filtered[filtered["COURSENAME"].astype(str).str.strip() == str(selected_course).strip()].copy()
+    if stream_col and selected_stream and stream_col in filtered.columns:
+        filtered = filtered[filtered[stream_col].astype(str).str.strip() == str(selected_stream).strip()].copy()
+    if selected_semester and "SEMESTER" in filtered.columns:
+        filtered = filtered[filtered["SEMESTER"].astype(str).str.strip() == str(selected_semester).strip()].copy()
+    return filtered

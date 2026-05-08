@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import re
 from typing import List, Optional
+import streamlit as st
 from scipy.stats import skew
 from utils.processor import parse_grade_value, normalize_token
 
@@ -23,6 +24,7 @@ ROLL_YEAR_START_INDEX = 6
 ROLL_YEAR_END_INDEX = 8
 # Sentinel value used throughout to indicate "semester order unknown / unparseable".
 UNKNOWN_SEMESTER_ORDER = 999
+GRADE_TO_POINT = {"O": 10, "E": 9, "A": 8, "B": 7, "C": 6, "D": 5, "F": 0}
 
 def normalize_semester_label(semester_value: object) -> str:
     text = str(semester_value).strip() if semester_value is not None else ""
@@ -383,7 +385,66 @@ def get_class_masks(df: pd.DataFrame, roll_col: str = "ROLL NO"):
     old_batch_mask.loc[parsed.index] = ~is_current
     return current_class_mask, old_batch_mask
 
-def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFrame:
+@st.cache_data(ttl=1800)
+def get_subject_parse_cache(df: pd.DataFrame, subject_cols: tuple, session_id: str):
+    grades_by_subject = {}
+    marks_by_subject = {}
+    grade_points_by_subject = {}
+    numeric_by_subject = {}
+    for subj in subject_cols:
+        if subj not in df.columns:
+            continue
+        parsed = df[subj].apply(parse_grade_value)
+        grades = parsed.apply(lambda x: x[0] if isinstance(x, tuple) else None)
+        marks = pd.to_numeric(parsed.apply(lambda x: x[1] if isinstance(x, tuple) else None), errors="coerce")
+        grade_points = pd.to_numeric(grades.map(GRADE_TO_POINT), errors="coerce")
+        grades_by_subject[subj] = grades
+        marks_by_subject[subj] = marks
+        grade_points_by_subject[subj] = grade_points
+        numeric_by_subject[subj] = marks.where(marks.notna(), grade_points)
+    return {
+        "grades": grades_by_subject,
+        "marks": marks_by_subject,
+        "grade_points": grade_points_by_subject,
+        "numeric_values": numeric_by_subject,
+    }
+
+@st.cache_data(ttl=1800)
+def get_valid_subjects(df: pd.DataFrame, subject_cols: tuple, session_id: str):
+    skip_list = {
+        "OVERALL RESULT",
+        "SEMETER RESULT",
+        "SEMESTER RESULT",
+        "TOTAL MAR POINTS",
+        "TOTAL MARK POINTS",
+        "TOTAL MAR \nPOINTS",
+    }
+    parsed_cache = get_subject_parse_cache(df, subject_cols, session_id)
+    valid_subjects = []
+    for subj in subject_cols:
+        if subj not in df.columns or str(subj).upper().strip() in skip_list:
+            continue
+        grades = parsed_cache["grades"].get(subj, pd.Series(dtype=object))
+        marks = parsed_cache["marks"].get(subj, pd.Series(dtype=float))
+        if grades.notna().any() or marks.notna().any():
+            valid_subjects.append(subj)
+    return tuple(valid_subjects)
+
+@st.cache_data(ttl=1800)
+def get_numeric_metric_series(df: pd.DataFrame, col: str, session_id: str):
+    if col not in df.columns:
+        return pd.Series(dtype=float)
+    series = df[col]
+    if series.dtype == "object":
+        parsed = series.apply(parse_grade_value)
+        grades = parsed.apply(lambda x: x[0] if isinstance(x, tuple) else None)
+        marks = pd.to_numeric(parsed.apply(lambda x: x[1] if isinstance(x, tuple) else None), errors="coerce")
+        grade_points = pd.to_numeric(grades.map(GRADE_TO_POINT), errors="coerce")
+        return marks.where(marks.notna(), grade_points)
+    return pd.to_numeric(series, errors="coerce")
+
+@st.cache_data(ttl=1800)
+def determine_student_status(df: pd.DataFrame, semester_name: str, session_id: str = "") -> pd.DataFrame:
     df = df.copy()
     even_keywords = ["SECOND", "FOURTH", "SIXTH", "EIGHT", "EIGHTH", "TENTH"]
     is_even_sem = any(k in str(semester_name).upper() for k in even_keywords)
@@ -392,59 +453,65 @@ def determine_student_status(df: pd.DataFrame, semester_name: str) -> pd.DataFra
     expected_elapsed_years = max(0, (semester_order - 1) // 2) if semester_order != 999 else None
     
     current_class_mask, _ = get_class_masks(df)
-    
-    statuses = []
-    timeline_statuses = []
-    for idx, row in df.iterrows():
-        sem_result = str(row.get("SEMESTER RESULT", "")).upper()
-        has_ygpa = pd.notna(row.get("YGPA")) and str(row.get("YGPA")).strip() != ""
-        
-        # 1. Year Lag check
-        if is_even_sem and not has_ygpa and "PASS" not in sem_result:
-            statuses.append("Year Lag")
-        # 2. Old Batch check (If they aren't current class, they are old batch backlogs)
-        elif not current_class_mask[idx]:
-            statuses.append("Old Batch (Re-appearing)")
-        # 3. Current Batch Pass
-        elif "PASS" in sem_result:
-            statuses.append("Current Batch")
-        # 4. Current Batch Fail/Backlog
-        else:
-            statuses.append("Backlog (Current Batch)")
 
-        exam_year = pd.to_numeric(row.get("EXAM YEAR"), errors="coerce")
-        admission_year = infer_academic_year_from_roll(row.get("ROLL NO"))
-        if pd.isna(exam_year) or admission_year is None or expected_elapsed_years is None:
-            timeline_statuses.append("Unknown")
-        else:
-            elapsed_years = exam_year - admission_year
-            if elapsed_years < 0:
-                timeline_statuses.append("Unknown")
-            # expected_elapsed_years is the normal admission-to-exam gap for the selected semester.
-            # same/less => current cohort, +1 => older (past year), beyond +1 => reappearing backlog.
-            elif elapsed_years <= expected_elapsed_years:
-                timeline_statuses.append("Current Year Students")
-            elif elapsed_years == expected_elapsed_years + 1:
-                timeline_statuses.append("Past Year Students")
-            else:
-                timeline_statuses.append("Reappearing Students")
-            
-    df["STATUS"] = statuses
-    df["EXAM TIMELINE"] = timeline_statuses
+    sem_result = df.get("SEMESTER RESULT", pd.Series("", index=df.index)).astype(str).str.upper()
+    has_ygpa = (
+        df.get("YGPA", pd.Series(index=df.index, dtype=object))
+        .notna()
+        & df.get("YGPA", pd.Series(index=df.index, dtype=object)).astype(str).str.strip().ne("")
+    )
+    pass_mask = sem_result.str.contains("PASS", na=False)
+    year_lag_mask = is_even_sem & (~has_ygpa) & (~pass_mask)
+    old_batch_mask = ~current_class_mask
+
+    df["STATUS"] = np.select(
+        [year_lag_mask, old_batch_mask, pass_mask],
+        ["Year Lag", "Old Batch (Re-appearing)", "Current Batch"],
+        default="Backlog (Current Batch)",
+    )
+
+    exam_year = pd.to_numeric(df.get("EXAM YEAR", pd.Series(index=df.index)), errors="coerce")
+    admission_year = pd.to_numeric(
+        df.get("ROLL NO", pd.Series(index=df.index, dtype=object)).apply(infer_academic_year_from_roll),
+        errors="coerce",
+    )
+    elapsed_years = exam_year - admission_year
+
+    if expected_elapsed_years is None:
+        df["EXAM TIMELINE"] = "Unknown"
+        return df
+
+    valid_timeline = exam_year.notna() & admission_year.notna() & (elapsed_years >= 0)
+    df["EXAM TIMELINE"] = np.select(
+        [
+            valid_timeline & (elapsed_years <= expected_elapsed_years),
+            valid_timeline & (elapsed_years == expected_elapsed_years + 1),
+            valid_timeline & (elapsed_years > expected_elapsed_years + 1),
+        ],
+        ["Current Year Students", "Past Year Students", "Reappearing Students"],
+        default="Unknown",
+    )
     return df
 
-def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFrame:
+@st.cache_data(ttl=1800)
+def calculate_subject_stats(
+    df: pd.DataFrame,
+    subject_cols: tuple,
+    session_id: str = "",
+    parsed_subject_cache=None,
+) -> pd.DataFrame:
+    parsed_cache = parsed_subject_cache or get_subject_parse_cache(df, subject_cols, session_id)
     stats_list = []
     for subj in subject_cols:
-        if subj not in df.columns: continue
-            
-        parsed = df[subj].apply(parse_grade_value)
-        grades = [p[0] for p in parsed if p[0] is not None]
-        marks = [p[1] for p in parsed if p[1] is not None]
-        
-        if not marks: continue
-        marks_series = pd.Series(marks).dropna()
-        grade_counts = pd.Series(grades).value_counts().to_dict()
+        if subj not in df.columns:
+            continue
+
+        grades_series = parsed_cache["grades"].get(subj, pd.Series(dtype=object)).dropna()
+        marks_series = parsed_cache["marks"].get(subj, pd.Series(dtype=float)).dropna()
+
+        if marks_series.empty:
+            continue
+        grade_counts = grades_series.value_counts().to_dict()
         
         stat_row = {
             "Subject": subj,
@@ -460,28 +527,19 @@ def calculate_subject_stats(df: pd.DataFrame, subject_cols: list) -> pd.DataFram
         stats_list.append(stat_row)
     return pd.DataFrame(stats_list)
 
-def calculate_z_scores(df: pd.DataFrame, col: str) -> pd.DataFrame:
+@st.cache_data(ttl=1800)
+def calculate_z_scores(
+    df: pd.DataFrame,
+    col: str,
+    session_id: str = "",
+    numeric_series: Optional[pd.Series] = None,
+) -> pd.DataFrame:
     df_clean = df.copy()
-    
-    def extract_numeric(val):
-        grade, marks = parse_grade_value(val)
-        
-        # 1. If we have the numeric points (e.g., from "A(32)"), use them!
-        if marks is not None:
-            return marks
-            
-        # 2. THE FALLBACK: If we only have a grade (e.g., "A"), map it to the strict KGEC scale
-        grade_to_point = {'O': 10, 'E': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'F': 0}
-        if grade in grade_to_point:
-            return grade_to_point[grade]
-            
-        # 3. If it's empty, absent, or "---", return None
-        return None
 
-    if df_clean[col].dtype == 'object':
-        df_clean['NUMERIC_VAL'] = df_clean[col].apply(extract_numeric)
+    if numeric_series is not None:
+        df_clean["NUMERIC_VAL"] = pd.to_numeric(numeric_series.reindex(df_clean.index), errors="coerce")
     else:
-        df_clean['NUMERIC_VAL'] = pd.to_numeric(df_clean[col], errors='coerce')
+        df_clean["NUMERIC_VAL"] = get_numeric_metric_series(df_clean, col, session_id).reindex(df_clean.index)
     
     # Drop anyone who doesn't have a valid number or grade point
     df_clean = df_clean.dropna(subset=['NUMERIC_VAL'])

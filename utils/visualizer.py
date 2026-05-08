@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 from utils.constants import LOGO_CANDIDATE_PATHS, SOFT_COLORS, COLLEGE_NAME
+from utils.processor import get_or_create_session_id
 
 def downloadable_plot(fig, filename: str):
     fig.tight_layout()
@@ -39,6 +40,7 @@ def resolve_logo_path() -> Optional[str]:
     return None
 
 def render_sidebar_branding():
+    get_or_create_session_id()
     st.sidebar.markdown(
         """
         <style>
@@ -73,6 +75,11 @@ def render_sidebar_branding():
     st.sidebar.markdown("**Kalyani Government Engineering College**")
     st.sidebar.markdown("---")
     st.sidebar.caption("🎓 Result Analysis Tool")
+    if st.sidebar.button("Clear uploaded data / reset session", key="clear_uploaded_data", use_container_width=True):
+        st.session_state.clear()
+        st.cache_data.clear()
+        get_or_create_session_id()
+        st.rerun()
     st.sidebar.markdown("<div class='sidebar-author-credit'>Designed by <b>Nirjhar Debnath</b>, Dept of CSE, KGEC</div>", unsafe_allow_html=True)
 
 def style_axis(ax, xlabel: Optional[str] = None, ylabel: Optional[str] = None, rotate_x: int = 0):
