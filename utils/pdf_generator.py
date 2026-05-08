@@ -112,8 +112,8 @@ def create_master_report_pdf(
     pdf.ln(5)
 
     # Determine whether to include a Teacher column
-    _has_teachers = bool(teacher_names and any(teacher_names.values()))
-    if _has_teachers:
+    has_teachers = bool(teacher_names and any(teacher_names.values()))
+    if has_teachers:
         # Widths sum to 190mm; Subject narrowed to 38, Teacher at 22
         pdf.set_font("Arial", "B", 8)
         headers = ["Subject", "Teacher", "Mean", "Med", "SD", "Skew", "Pass %", "O", "E", "A", "B", "C", "D", "F"]
@@ -130,7 +130,7 @@ def create_master_report_pdf(
     
     pdf.set_font("Arial", "", 7)
     for _, row in subject_stats_df.iterrows():
-        if _has_teachers:
+        if has_teachers:
             pdf.cell(38, 7, clean_text(str(row["Subject"])[:28]), border=1)
             _teacher_val = clean_text(str(row.get("Teacher", ""))[:18])
             pdf.cell(22, 7, _teacher_val, border=1)
@@ -273,16 +273,16 @@ def create_master_report_pdf(
         pdf.ln(5)
 
         # Build a list of (subject_code, teacher_name) parallel to subject_curve_figs
-        _subj_teacher_list = []
+        subj_teacher_list = []
         if subject_codes:
-            for _sc in subject_codes:
-                _tname = (teacher_names or {}).get(_sc, "")
-                _subj_teacher_list.append((_sc, _tname))
+            for subject_code in subject_codes:
+                teacher_name = (teacher_names or {}).get(subject_code, "")
+                subj_teacher_list.append((subject_code, teacher_name))
         # Pad if needed (shouldn't be necessary in normal flow)
-        while len(_subj_teacher_list) < len(subject_curve_figs):
-            _subj_teacher_list.append(("", ""))
+        while len(subj_teacher_list) < len(subject_curve_figs):
+            subj_teacher_list.append(("", ""))
 
-        for _idx, figure_entry in enumerate(subject_curve_figs):
+        for idx, figure_entry in enumerate(subject_curve_figs):
             if isinstance(figure_entry, (list, tuple)):
                 top_fig = figure_entry[0] if len(figure_entry) > 0 else None
                 bottom_fig = figure_entry[1] if len(figure_entry) > 1 else None
@@ -292,11 +292,11 @@ def create_master_report_pdf(
             if top_fig is None:
                 continue
             # Print teacher name label before each subject's pair of charts
-            if _idx < len(_subj_teacher_list):
-                _, _tname = _subj_teacher_list[_idx]
-                if _tname:
+            if idx < len(subj_teacher_list):
+                _, teacher_name = subj_teacher_list[idx]
+                if teacher_name:
                     pdf.set_font("Arial", "I", 9)
-                    pdf.cell(190, 5, clean_text(f"Teacher: {_tname}"), ln=True)
+                    pdf.cell(190, 5, clean_text(f"Teacher: {teacher_name}"), ln=True)
                     pdf.ln(1)
             _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=110)
 

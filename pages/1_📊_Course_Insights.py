@@ -250,14 +250,14 @@ if data:
         )
         if valid_subjects:
             cols_per_row = 2
-            for _i in range(0, len(valid_subjects), cols_per_row):
-                _row_cols = st.columns(cols_per_row)
-                for _j, _subj in enumerate(valid_subjects[_i:_i + cols_per_row]):
-                    with _row_cols[_j]:
+            for i in range(0, len(valid_subjects), cols_per_row):
+                row_cols = st.columns(cols_per_row)
+                for j, subj in enumerate(valid_subjects[i:i + cols_per_row]):
+                    with row_cols[j]:
                         st.text_input(
-                            format_subject(_subj),
-                            value=st.session_state.get(f"teacher_input_{selected_semester}_{_subj}", ""),
-                            key=f"teacher_input_{selected_semester}_{_subj}",
+                            format_subject(subj),
+                            value=st.session_state.get(f"teacher_input_{selected_semester}_{subj}", ""),
+                            key=f"teacher_input_{selected_semester}_{subj}",
                             placeholder="Enter teacher name…",
                         )
         else:
