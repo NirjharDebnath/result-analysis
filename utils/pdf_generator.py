@@ -74,7 +74,7 @@ def create_master_report_pdf(
         session_info += f" | Exam Session: {exam_session}"
     pdf.cell(190, 6, clean_text(session_info), ln=True, align="C")
     
-    pdf.ln(10)
+    pdf.ln(4)
     # Logo centered below college name
     if logo_path and os.path.exists(logo_path):
         logo_w = 22  # mm
@@ -86,7 +86,7 @@ def create_master_report_pdf(
     pdf.cell(190, 7, clean_text(f"Combined Result Analysis Report - {course_name}"), ln=True, align="C")
     pdf.set_font("Arial", "", 9)
     pdf.cell(190, 6, clean_text(f"Semester: {semester} | {year_name}"), ln=True, align="C")
-    pdf.ln(4)
+    pdf.ln(10)
 
     # Overview graph
     if overview_fig is not None:
