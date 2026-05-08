@@ -291,10 +291,16 @@ def create_master_report_pdf(
                 bottom_fig = None
             if top_fig is None:
                 continue
-            # Print teacher name label before each subject's pair of charts
+            # Print teacher name label before each subject's pair of charts,
+            # ensuring the label and charts land on the same page.
             if idx < len(subj_teacher_list):
                 _, teacher_name = subj_teacher_list[idx]
                 if teacher_name:
+                    label_height = 6  # cell(h=5) + ln(1)
+                    top_h = TOP_FIG_HEIGHT_EST
+                    bot_h = (BOTTOM_FIG_HEIGHT_EST + STACK_VERTICAL_GAP) if bottom_fig is not None else 0
+                    if pdf.get_y() + label_height + top_h + bot_h > PAGE_CONTENT_LIMIT_Y:
+                        pdf.add_page()
                     pdf.set_font("Arial", "I", 9)
                     pdf.cell(190, 5, clean_text(f"Teacher: {teacher_name}"), ln=True)
                     pdf.ln(1)
