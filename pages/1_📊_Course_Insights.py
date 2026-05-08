@@ -458,6 +458,16 @@ if data:
                     
                     z_summary_df = filtered_z_df[["ROLL NO", "NAME", "NUMERIC_VAL", "Z-Score", "Performance"]].copy()
                     z_summary_df.columns = ["ROLL NO", "NAME", "VALUE", "Z-SCORE", "CATEGORY"]
+
+                    # Inject Student Type from STATUS + lateral entry detection
+                    if "STATUS" in filtered_z_df.columns:
+                        lat_in_z = lateral_mask.reindex(filtered_z_df.index, fill_value=False)
+                        z_summary_df.insert(
+                            2, "STUDENT TYPE",
+                            [f"Lateral Entry ({s})" if l else s
+                             for s, l in zip(filtered_z_df["STATUS"], lat_in_z)],
+                        )
+
                     st.dataframe(z_summary_df, width='stretch', hide_index=True)
 
                     st.write("") 
