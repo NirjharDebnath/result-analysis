@@ -67,11 +67,11 @@ def create_master_report_pdf(
     pdf.cell(190, 8, clean_text(college_name), ln=True, align="C")
     
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 7, clean_text(f"{course_name} | {year_name}"), ln=True, align="C")
+    # pdf.cell(190, 7, clean_text(f"{course_name} | {year_name}"), ln=True, align="C")
     pdf.set_font("Arial", "", 10)
-    session_info = f"Semester: {semester}"
+    session_info = ""
     if exam_session:
-        session_info += f" | Exam Session: {exam_session}"
+        session_info += f"Exam Session: {exam_session}"
     pdf.cell(190, 6, clean_text(session_info), ln=True, align="C")
     
     pdf.ln(4)
@@ -84,7 +84,7 @@ def create_master_report_pdf(
     # Course and semester lines
     pdf.set_font("Arial", "B", 11)
     pdf.cell(190, 7, clean_text(f"Combined Result Analysis Report - {course_name}"), ln=True, align="C")
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Arial", "B", 9)
     pdf.cell(190, 6, clean_text(f"Semester: {semester} | {year_name}"), ln=True, align="C")
     pdf.ln(10)
 
