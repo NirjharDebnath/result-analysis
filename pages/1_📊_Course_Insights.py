@@ -255,7 +255,7 @@ if data:
     ]
 
     # --- TEACHER NAMES EXPANDER ---
-    with st.expander("👩‍🏫 Subject Teachers", expanded=False):
+    with st.expander("Assign Subject Teachers", expanded=False):
         st.caption(
             "Enter the name of the teacher responsible for each subject. "
             "Names will appear in the Statistical Matrix, Distribution Curves, and the exported PDF report."
