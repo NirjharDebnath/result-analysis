@@ -18,6 +18,7 @@ from utils.subjects import (
     subject_label_formatter,
     subject_mapping_from_dataframe,
     subject_mapping_to_dataframe,
+    get_subject_normalization_log,
 )
 from utils.analytics import build_semester_year_groups
 from utils.visualizer import render_sidebar_branding, render_footer
@@ -221,6 +222,11 @@ if uploaded_files:
         else:
             st.success("✅ Dataset validated successfully.")
             st.caption(f"Processed {len(uploaded_files)} file(s).")
+            duplicate_files = list(df.attrs.get("duplicate_files", []))
+            if duplicate_files:
+                st.error(f"⚠️ Duplicate file content detected in {len(duplicate_files)} file(s). One or more uploaded files had the exact same content as another file and were ignored to avoid double counting and miscalculations. The file(s) is/are listed below.")
+                for dup_file in duplicate_files:
+                    st.write(f"- {dup_file}")
             dedup_removed = int(df.attrs.get("dropped_duplicate_rows", 0))
             if dedup_removed > 0:
                 st.caption(f"Removed {dedup_removed} duplicate row(s) with exactly matching student data.")
@@ -230,8 +236,8 @@ if uploaded_files:
             unique_groups = sorted(semester_groups_df["GROUP_LABEL"].dropna().astype(str).unique().tolist())
             if len(unique_semesters) > 1:
                 st.info(f"📊 Detected **{len(unique_semesters)} semesters** in this dataset. Head to the **Semester Comparison** page in the sidebar to compare them side by side.")
-            elif len(unique_groups) > 1:
-                st.info(f"📊 Detected **{len(unique_groups)} academic-year groups** within the same semester. Use **Semester Comparison** for year-wise analysis.")
+            # elif len(unique_groups) > 1:
+            #     st.info(f"📊 Detected **{len(unique_groups)} academic-year groups** within the same semester. Use **Semester Comparison** for year-wise analysis.")
             else:
                 st.warning("Only one semester/year group detected. Comparison features will be limited until more semester data is uploaded.")
             st.caption("✅ Next: choose a page from the left sidebar — **Course Insights**, **Rankings**, **Student Profile**, or **Semester Comparison**.")
@@ -252,6 +258,18 @@ if uploaded_files:
                 st.subheader("Subject Columns")
                 st.caption("These columns contain subject-wise grades or marks.")
                 st.write([format_subject(col) for col in subject_cols])
+
+                # Small collapsible warning showing normalization events from uploaded files
+                try:
+                    norm_log = get_subject_normalization_log()
+                except Exception:
+                    norm_log = {}
+
+                if norm_log:
+                    with st.expander(f"⚠️ Normalized {len(norm_log)} subject code(s) — view details", expanded=False):
+                        st.warning("Some subject codes in the uploaded file were auto-normalized to match the mapping.")
+                        for orig, norm in norm_log.items():
+                            st.write(f"- {orig} → {norm}")
                 
     except Exception as exc:
         st.error(f"Unable to read uploaded file. Details: {exc}")

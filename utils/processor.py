@@ -1,5 +1,6 @@
 # utils/processor.py
 import re
+import hashlib
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 import pandas as pd
@@ -182,6 +183,25 @@ def deduplicate_exact_rows(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     deduped_df = df.loc[~duplicate_mask].copy().reset_index(drop=True)
     return deduped_df, duplicate_count
 
+def fingerprint_dataframe_content(df: pd.DataFrame) -> str:
+    """Create a stable fingerprint for exact dataset content, independent of column order and row order."""
+    if df.empty:
+        return "EMPTY"
+
+    canonical = df.copy()
+    canonical = canonical.reindex(sorted(canonical.columns), axis=1)
+    for col in canonical.columns:
+        series = canonical[col]
+        if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
+            canonical[col] = series.fillna("").astype(str).str.strip()
+        else:
+            canonical[col] = series
+
+    row_hashes = pd.util.hash_pandas_object(canonical, index=False).astype("uint64").tolist()
+    row_hashes.sort()
+    digest = hashlib.sha256("|".join(map(str, row_hashes)).encode("utf-8")).hexdigest()
+    return digest
+
 def is_metadata_column(col: str) -> bool:
     token = normalize_token(col)
     if col in KNOWN_NON_SUBJECT_COLUMNS:
@@ -272,12 +292,20 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
     files = uploaded_files if isinstance(uploaded_files, list) else [uploaded_files]
     datasets: List[pd.DataFrame] = []
     file_errors: List[str] = []
+    duplicate_files: List[str] = []
+    seen_fingerprints: Dict[str, str] = {}
 
     expected_errors = (ValueError, pd.errors.ParserError, UnicodeDecodeError, OSError)
     for uploaded_file in files:
         file_name = str(getattr(uploaded_file, "name", "Unknown file")).strip()
         try:
             file_df = read_uploaded_dataset(uploaded_file)
+            file_fingerprint = fingerprint_dataframe_content(file_df)
+            if file_fingerprint in seen_fingerprints:
+                duplicate_files.append(file_name)
+                continue
+            seen_fingerprints[file_fingerprint] = file_name
+
             file_df["SOURCE FILE"] = file_name
 
             session_meta = (exam_session_by_file or {}).get(file_name, {})
@@ -304,6 +332,7 @@ def read_uploaded_datasets(uploaded_files, exam_session_by_file: Optional[Dict[s
     combined_df = pd.concat(datasets, ignore_index=True)
     combined_df, duplicate_count = deduplicate_exact_rows(combined_df)
     combined_df.attrs["dropped_duplicate_rows"] = duplicate_count
+    combined_df.attrs["duplicate_files"] = duplicate_files
     return combined_df
 
 

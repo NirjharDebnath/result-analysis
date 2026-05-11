@@ -3,6 +3,7 @@ from fpdf import FPDF
 import tempfile
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 
 class KGEC_PDF(FPDF):
     def __init__(self, logo_path=None, *args, **kwargs):
@@ -95,10 +96,19 @@ def create_master_report_pdf(
         pdf.set_font("Arial", "", 9)
         pdf.multi_cell(190, 5, "Complete breakdown of the current batch: pass/fail composition, lateral vs regular students, and reappearing student outcomes.")
         pdf.ln(2)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            overview_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-            pdf.image(tmp.name, x=5, y=None, w=200)
-            tmp_files_to_clean.append(tmp.name)
+        if isinstance(overview_fig, str):
+            # already a temp file path
+            pdf.image(overview_fig, x=5, y=None, w=200)
+            tmp_files_to_clean.append(overview_fig)
+        else:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                overview_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp.name, x=5, y=None, w=200)
+                tmp_files_to_clean.append(tmp.name)
+            try:
+                plt.close(overview_fig)
+            except Exception:
+                pass
         pdf.ln(4)
 
     # --- Page 2: Combined Batch Overview + Executive Summary table, then Subject Statistics ---
@@ -186,20 +196,37 @@ def create_master_report_pdf(
         if combined_grade_figs:
             pdf.set_font("Arial", "B", 10)
             pdf.cell(190, 6, "Per-Subject Grade Distribution", ln=True)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                combined_grade_figs[0].savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-                pdf.image(tmp.name, x=10, y=None, w=188)
-                tmp_files_to_clean.append(tmp.name)
+            first = combined_grade_figs[0]
+            if isinstance(first, str):
+                pdf.image(first, x=10, y=None, w=188)
+                tmp_files_to_clean.append(first)
+            else:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                    first.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                    pdf.image(tmp.name, x=10, y=None, w=188)
+                    tmp_files_to_clean.append(tmp.name)
+                try:
+                    plt.close(first)
+                except Exception:
+                    pass
             pdf.ln(4)
             for idx, fig in enumerate(combined_grade_figs[1:], start=2):
                 if pdf.get_y() > 170:
                     pdf.add_page()
                 pdf.set_font("Arial", "", 9)
                 pdf.cell(190, 5, f"Subject Grade Distribution {idx}", ln=True)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                    fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-                    pdf.image(tmp.name, x=10, y=None, w=188)
-                    tmp_files_to_clean.append(tmp.name)
+                if isinstance(fig, str):
+                    pdf.image(fig, x=10, y=None, w=188)
+                    tmp_files_to_clean.append(fig)
+                else:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                        fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                        pdf.image(tmp.name, x=10, y=None, w=188)
+                        tmp_files_to_clean.append(tmp.name)
+                    try:
+                        plt.close(fig)
+                    except Exception:
+                        pass
                 pdf.ln(3)
 
         if combined_metric_figs:
@@ -207,20 +234,37 @@ def create_master_report_pdf(
                 pdf.add_page()
             pdf.set_font("Arial", "B", 10)
             pdf.cell(190, 6, "Comparative Metric Charts", ln=True)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                combined_metric_figs[0].savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-                pdf.image(tmp.name, x=10, y=None, w=188)
-                tmp_files_to_clean.append(tmp.name)
+            firstm = combined_metric_figs[0]
+            if isinstance(firstm, str):
+                pdf.image(firstm, x=10, y=None, w=188)
+                tmp_files_to_clean.append(firstm)
+            else:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                    firstm.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                    pdf.image(tmp.name, x=10, y=None, w=188)
+                    tmp_files_to_clean.append(tmp.name)
+                try:
+                    plt.close(firstm)
+                except Exception:
+                    pass
             pdf.ln(4)
             for idx, fig in enumerate(combined_metric_figs[1:], start=2):
                 if pdf.get_y() > 170:
                     pdf.add_page()
                 pdf.set_font("Arial", "", 9)
                 pdf.cell(190, 5, f"Comparative Metric Chart {idx}", ln=True)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                    fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-                    pdf.image(tmp.name, x=10, y=None, w=188)
-                    tmp_files_to_clean.append(tmp.name)
+                if isinstance(fig, str):
+                    pdf.image(fig, x=10, y=None, w=188)
+                    tmp_files_to_clean.append(fig)
+                else:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                        fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                        pdf.image(tmp.name, x=10, y=None, w=188)
+                        tmp_files_to_clean.append(tmp.name)
+                    try:
+                        plt.close(fig)
+                    except Exception:
+                        pass
                 pdf.ln(3)
 
     def _draw_vertical_pair(top_fig, bottom_fig=None, top_width=152, bottom_width=110):
@@ -232,17 +276,26 @@ def create_master_report_pdf(
             pdf.add_page()
 
         y_start = pdf.get_y()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_top:
-            top_fig.savefig(tmp_top.name, format="png", bbox_inches="tight", dpi=150)
-            pdf.image(tmp_top.name, x=(210 - top_width) / 2, y=y_start, w=top_width)
-            tmp_files_to_clean.append(tmp_top.name)
+        # handle top_fig which may be a path or a figure
+        if isinstance(top_fig, str):
+            pdf.image(top_fig, x=(210 - top_width) / 2, y=y_start, w=top_width)
+            tmp_files_to_clean.append(top_fig)
+        else:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_top:
+                top_fig.savefig(tmp_top.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp_top.name, x=(210 - top_width) / 2, y=y_start, w=top_width)
+                tmp_files_to_clean.append(tmp_top.name)
 
         y_after_top = y_start + top_height_est
         if bottom_fig is not None:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_bottom:
-                bottom_fig.savefig(tmp_bottom.name, format="png", bbox_inches="tight", dpi=150)
-                pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + TOP_TO_BOTTOM_OFFSET, w=bottom_width)
-                tmp_files_to_clean.append(tmp_bottom.name)
+            if isinstance(bottom_fig, str):
+                pdf.image(bottom_fig, x=(210 - bottom_width) / 2, y=y_after_top + TOP_TO_BOTTOM_OFFSET, w=bottom_width)
+                tmp_files_to_clean.append(bottom_fig)
+            else:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_bottom:
+                    bottom_fig.savefig(tmp_bottom.name, format="png", bbox_inches="tight", dpi=150)
+                    pdf.image(tmp_bottom.name, x=(210 - bottom_width) / 2, y=y_after_top + TOP_TO_BOTTOM_OFFSET, w=bottom_width)
+                    tmp_files_to_clean.append(tmp_bottom.name)
             pdf.set_y(y_after_top + bottom_height_est + STACK_BOTTOM_PADDING)
         else:
             pdf.set_y(y_after_top + SINGLE_CHART_BOTTOM_PADDING)
@@ -265,6 +318,16 @@ def create_master_report_pdf(
             if top_fig is None:
                 continue
             _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=152)
+            try:
+                if not isinstance(top_fig, str):
+                    plt.close(top_fig)
+            except Exception:
+                pass
+            try:
+                if bottom_fig is not None and not isinstance(bottom_fig, str):
+                    plt.close(bottom_fig)
+            except Exception:
+                pass
 
     # --- Pages 4+: All Subject Curves (Stacked 2 per page) ---
     if subject_curve_figs:
@@ -305,6 +368,16 @@ def create_master_report_pdf(
                     pdf.cell(190, 5, clean_text(f"Teacher: {teacher_name}"), ln=True)
                     pdf.ln(1)
             _draw_vertical_pair(top_fig, bottom_fig, top_width=152, bottom_width=110)
+            try:
+                if not isinstance(top_fig, str):
+                    plt.close(top_fig)
+            except Exception:
+                pass
+            try:
+                if bottom_fig is not None and not isinstance(bottom_fig, str):
+                    plt.close(bottom_fig)
+            except Exception:
+                pass
 
     # --- Z-Score Table ---
     if not z_score_df.empty:
@@ -364,10 +437,18 @@ def create_master_report_pdf(
         pdf.set_font("Arial", "B", 14)
         pdf.cell(190, 15, "Inter-Semester Comparison Analysis", ln=True, align="C")
         pdf.ln(5)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            comparison_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
-            pdf.image(tmp.name, x=10, w=190)
-            tmp_files_to_clean.append(tmp.name)
+        if isinstance(comparison_fig, str):
+            pdf.image(comparison_fig, x=10, w=190)
+            tmp_files_to_clean.append(comparison_fig)
+        else:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                comparison_fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+                pdf.image(tmp.name, x=10, w=190)
+                tmp_files_to_clean.append(tmp.name)
+            try:
+                plt.close(comparison_fig)
+            except Exception:
+                pass
         pdf.ln(10)
         pdf.set_font("Arial", "I", 9)
         pdf.multi_cell(190, 6, "Note: This chart compares performance metrics across the selected academic sessions and semesters.")

@@ -221,7 +221,15 @@ if data:
         title="Combined GPA Comparison"
     )
     st.pyplot(fig, width='stretch')
-    st.session_state["comparison_fig"] = fig
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        fig.savefig(tmp.name, format="png", bbox_inches="tight", dpi=150)
+        st.session_state["comparison_fig"] = tmp.name
+    try:
+        import matplotlib.pyplot as _plt
+        _plt.close(fig)
+    except Exception:
+        pass
 
     with st.expander("📝 View Comparison Data Table"):
         display_table = comparison_results[

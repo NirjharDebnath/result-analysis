@@ -154,11 +154,11 @@ if data:
     df, all_subject_cols = data
     subject_mapping = get_subject_mapping()
     format_subject = subject_label_formatter(subject_mapping)
-    st.sidebar.header("Data Filters")
-    course_df = apply_course_stream_filters(df, "Select Course", "insight_course")
 
+    # --- Data Filters (on-page, below course selector) ---
+    course_df = apply_course_stream_filters(df, "Select Course", "insight_course")
     semesters = sorted(course_df["SEMESTER"].dropna().astype(str).unique().tolist())
-    selected_semester = st.sidebar.selectbox("Select Semester", semesters)
+    selected_semester = st.selectbox("Select Semester", semesters, key="insight_sem")
     session_id = get_or_create_session_id()
     filtered_df = cached_filter_semester_df(course_df, selected_semester, session_id)
     
@@ -368,15 +368,15 @@ if data:
 
             **The Golden Rule (68-95-99.7 Rule):**
             In a standard normal distribution:
-            * ~**68%** of students fall within 1 Standard Deviation ($\pm 1\sigma$) of the Mean ($\mu$). This is your "average" majority.
-            * ~**95%** of students fall within 2 Standard Deviations ($\pm 2\sigma$).
+            * ~**68%** of students fall within 1 Standard Deviation ($\\pm 1\\sigma$) of the Mean ($\\mu$). This is your "average" majority.
+            * ~**95%** of students fall within 2 Standard Deviations ($\\pm 2\\sigma$).
 
             **How it helps us analyze results:**
             * **Detect Paper Difficulty (Skewness):** If the curve's peak is shifted heavily to the left, it means most students scored poorly, indicating a **tough paper** or strict grading. If shifted to the right, it was an **easy paper**.
             * **Measure Batch Disparity (Width):** A **wide and flat** curve (high standard deviation) means there is a massive gap between the top students and the bottom students. A **tall and narrow** curve means the batch is highly consistent and learned at the same pace.
             * **Identify True Outliers:** The shaded regions visually isolate the exceptional performers (the far right tail) and those who might need immediate academic intervention (the far left tail).
             """)
-        st.caption("GPA metrics show bucket-wise student counts first, followed by a separate normal-distribution analysis with mean, standard deviation, and σ-region coverage. Subject distributions keep the histogram+curve view with the grade split pie chart shown below.")
+        st.caption("GPA metrics show range-wise student counts first, followed by a separate normal-distribution analysis with mean, standard deviation, and σ-region coverage. Subject distributions keep the histogram+curve view with the grade split pie chart shown below.")
         exclude_old_batch = st.toggle("🔍 Exclude Old Batch Students (Show Current Batch Only)", value=False)
         display_df = filtered_df[current_class_mask] if exclude_old_batch else filtered_df
 
@@ -412,7 +412,7 @@ if data:
 
                 _subj_teacher = teacher_names.get(selected_subj, "")
                 if _subj_teacher:
-                    st.caption(f"👩‍🏫 Teacher: **{_subj_teacher}**")
+                    st.caption(f"Teacher: **{_subj_teacher}**")
 
                 full_grades = parsed_grades_df[selected_subj].reindex(display_df.index)
                 full_subj = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
@@ -525,7 +525,7 @@ if data:
                     all_subject_figs = []
                     grade_to_point = {'O':10,'E':9,'A':8,'B':7,'C':6,'D':5,'F':0}
                     exclude_old_batch_state = exclude_old_batch 
-                    
+                    import tempfile
                     for subj in valid_subjects:
                         full_grades = parsed_grades_df[subj].reindex(filtered_df.index)
                         full_subj_num = pd.to_numeric(full_grades.map(grade_to_point), errors='coerce')
@@ -543,36 +543,81 @@ if data:
                             is_grade_scale=True,
                         )
                         if curve_fig is not None:
-                            all_subject_figs.append((curve_fig, pie_fig))
+                            # save to temp files immediately and close figures to avoid keeping many open
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t1:
+                                curve_fig.savefig(t1.name, format="png", bbox_inches="tight", dpi=150)
+                                curve_path = t1.name
+                            try:
+                                plt.close(curve_fig)
+                            except Exception:
+                                pass
+                            pie_path = None
+                            if pie_fig is not None:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t2:
+                                    pie_fig.savefig(t2.name, format="png", bbox_inches="tight", dpi=150)
+                                    pie_path = t2.name
+                                try:
+                                    plt.close(pie_fig)
+                                except Exception:
+                                    pass
+                            all_subject_figs.append((curve_path, pie_path))
 
                     # Generate bell curves for all valid GPA columns
                     all_gpa_figs = []
                     for gpa_col in valid_gpa_cols:
                         full_gpa_data = pd.to_numeric(filtered_df[gpa_col], errors='coerce')
                         reg_gpa_data = pd.to_numeric(filtered_df[current_class_mask][gpa_col], errors='coerce') if not exclude_old_batch_state else None
-                        gpa_buckets = plot_gpa_bucket_distribution(full_gpa_data, title=f"{gpa_col} Bucket Distribution")
+                        gpa_buckets = plot_gpa_bucket_distribution(full_gpa_data, title=f"{gpa_col} Distribution")
                         gpa_curve = plot_normal_distribution_stats(
                             reg_gpa_data if reg_gpa_data is not None else full_gpa_data,
                             title=f"{gpa_col} Normal Distribution Stats",
                             is_grade_scale=False,
                         )
-                        all_gpa_figs.append((gpa_buckets, gpa_curve))
+                        # save and close immediately
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t1:
+                            gpa_buckets.savefig(t1.name, format="png", bbox_inches="tight", dpi=150)
+                            gpa_buckets_path = t1.name
+                        try:
+                            plt.close(gpa_buckets)
+                        except Exception:
+                            pass
+                        gpa_curve_path = None
+                        if gpa_curve is not None:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t2:
+                                gpa_curve.savefig(t2.name, format="png", bbox_inches="tight", dpi=150)
+                                gpa_curve_path = t2.name
+                            try:
+                                plt.close(gpa_curve)
+                            except Exception:
+                                pass
+                        all_gpa_figs.append((gpa_buckets_path, gpa_curve_path))
 
                     all_stat_grade_figs = []
                     all_stat_metric_figs = []
                     if include_stat_visuals and not stats_df.empty:
                         for subject_name in stats_df["Subject"].astype(str).tolist():
-                            all_stat_grade_figs.append(
-                                plot_subject_grade_distribution_bars(stats_df, selected_subject=subject_name)
-                            )
+                            fig = plot_subject_grade_distribution_bars(stats_df, selected_subject=subject_name)
+                            # save and close
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t:
+                                fig.savefig(t.name, format="png", bbox_inches="tight", dpi=150)
+                                all_stat_grade_figs.append(t.name)
+                            try:
+                                plt.close(fig)
+                            except Exception:
+                                pass
                         for metric_name in [m for m in ["Mean", "Median", "Std Dev (σ)", "Pass %"] if m in stats_df.columns]:
-                            all_stat_metric_figs.append(
-                                plot_subject_metric_comparison_bars(
+                            fig = plot_subject_metric_comparison_bars(
                                     stats_df,
                                     selected_metric=metric_name,
                                     use_subject_codes=True,
                                 )
-                            )
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as t:
+                                fig.savefig(t.name, format="png", bbox_inches="tight", dpi=150)
+                                all_stat_metric_figs.append(t.name)
+                            try:
+                                plt.close(fig)
+                            except Exception:
+                                pass
 
                     summary = {
                         "Total Evaluated": len(filtered_df),

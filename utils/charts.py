@@ -747,6 +747,7 @@ def plot_subject_metric_comparison_bars(
         fig.suptitle(f"Comparative Subject Metric — {selected_metric}\n", fontsize=13, fontweight="bold")
 
     # plt.tight_layout()
+    plt.close()
     return fig
 
 

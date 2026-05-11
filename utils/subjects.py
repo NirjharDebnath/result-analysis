@@ -76,6 +76,7 @@ subjects = {
 }
 
 SUBJECT_MAPPING_STATE_KEY = "subject_mapping"
+SUBJECT_NORMALIZATION_LOG_KEY = "subject_normalization_log"
 SUBJECT_CODE_COLUMN = "Subject Code"
 SUBJECT_NAME_COLUMN = "Subject Name"
 _SUBJECT_CODE_SUFFIX_PATTERN = re.compile(r"^(.*?)(\s*\(\d+\))?$")
@@ -86,7 +87,25 @@ logger = logging.getLogger(__name__)
 def normalize_subject_code(code: object) -> str:
     if code is None:
         return ""
-    return str(code).strip().upper()
+    raw = str(code).strip()
+    upper_raw = raw.upper()
+    # Remove any non-alphanumeric characters so variants like
+    # 'BS-PH101', 'BSPH101', or 'BS PH101' all normalize to 'BSPH101'.
+    normalized = re.sub(r'[^A-Z0-9]', '', upper_raw)
+
+    # Record normalization events in session state so we can show a small UI hint
+    try:
+        if normalized and normalized != upper_raw:
+            log = st.session_state.get(SUBJECT_NORMALIZATION_LOG_KEY, {})
+            # keep first-seen mapping for display
+            if raw not in log:
+                log[raw] = normalized
+                st.session_state[SUBJECT_NORMALIZATION_LOG_KEY] = log
+    except Exception:
+        # If Streamlit session state isn't available, silently ignore logging
+        pass
+
+    return normalized
 
 
 def normalize_subject_mapping(mapping: Optional[Dict[object, object]]) -> Dict[str, str]:
@@ -189,3 +208,32 @@ def format_subject_label(subject_code: object, mapping: Optional[Dict[object, ob
 def subject_label_formatter(mapping: Optional[Dict[object, object]] = None):
     """Return a formatter callable for Streamlit format_func-style subject labels."""
     return lambda subject_code: format_subject_label(subject_code, mapping)
+
+
+def get_subject_normalization_log() -> Dict[str, str]:
+    """Return the current normalization log from session state."""
+    try:
+        return st.session_state.get(SUBJECT_NORMALIZATION_LOG_KEY, {})
+    except Exception:
+        return {}
+
+
+def render_subject_normalization_log(location: str = "sidebar") -> None:
+    """Render a very small on-site hint showing how many subject codes were auto-normalized.
+
+    By default this renders into the sidebar as a compact caption with an expander
+    to inspect original -> normalized mappings.
+    """
+    log = get_subject_normalization_log()
+    if not log:
+        return
+
+    container = st.sidebar if location == "sidebar" else st
+    try:
+        container.caption(f"Normalized subject codes: {len(log)}")
+        with container.expander("View normalized codes", expanded=False):
+            for orig, norm in log.items():
+                st.write(f"{orig} → {norm}")
+    except Exception:
+        # Don't break the app if UI rendering fails
+        pass
