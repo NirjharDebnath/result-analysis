@@ -344,5 +344,315 @@
   "OE-ME802J": "Cyber Security",
   "OE-ME802K": "Quantum Computing",
   "OE-ME802L": "Data Sciences",
-  "OE-ME802M": "Virtual Reality (VR)"
+  "OE-ME802M": "Virtual Reality (VR)",
+
+  "PGCSE101": "Advanced Engineering Mathematics",
+  "PGCSE102": "Advanced Operating System",
+  "PGCSE103": "Advanced Computer Architecture",
+  "PGCSE104": "Advanced Algorithms",
+
+  "PGCSE105A": "Artificial Neural Networks",
+  "PGCSE105B": "Agent Based Intelligent Systems",
+  "PGCSE105C": "Advanced Soft Computing",
+  "PGCSE105D": "Object Oriented Information System Design",
+  "PGCSE105E": "Software Engineering and CASE Tools",
+  "PGCSE105F": "Computer Graphics and Multimedia",
+
+  "PGCSE191": "Operating System Laboratory",
+  "PGCSE192A": "Advanced Programming Lab",
+  "PGCSE193": "Seminar Based on Literature Survey",
+
+  "PGCSE201": "Advanced DBMS",
+  "PGCSE202": "Advanced Computer Network and Security",
+  "PGCSE203": "Theory of Computation",
+
+  "PGCSE204A": "Cluster, Grid and Cloud Computing",
+  "PGCSE204B": "Mobile Computing",
+  "PGCSE204C": "Advanced Web Technology",
+  "PGCSE204D": "Soft Computing",
+  "PGCSE204E": "Cryptography and Computer Security",
+
+  "PGCSE205A": "Image Processing",
+  "PGCSE205B": "Pattern Recognition",
+  "PGCSE205C": "Real-time Embedded Systems and Programming",
+  "PGCSE205D": "Complex Systems",
+  "PGCSE205E": "Distributed System Principle",
+
+  "PGCSE291": "Computer Networking and DBMS Laboratory",
+  "PGCSE292": "Seminar Term Paper Leading to Project",
+
+  "PGCSE301A": "Project Management and Entrepreneurship",
+  "PGCSE301B": "Teaching and Research Methodologies",
+
+  "PGCSE302A": "Human Computer Interaction",
+  "PGCSE302B": "Bioinformatics",
+  "PGCSE302C": "Data Mining and Data Warehousing",
+  "PGCSE302D": "Compiler Construction",
+  "PGCSE302E": "VLSI Design",
+
+  "PGCSE391": "Project Part I (Dissertation I + Defence)",
+  "PGCSE491": "Project Part II (Dissertation II + Defence)",
+  "PGCSE492": "Comprehensive Viva Voice",
+
+  "EMM101": "Advanced Engineering Mathematics",
+  "PSM101": "Advanced Power System Analysis",
+  "PSM102": "High Voltage Transmission System",
+
+  "PSM103A": "Power System Planning and Reliability",
+  "PSM103B": "Power System Apparatus",
+  "PSM103C": "Power Quality",
+
+  "PSM104A": "Optimization Techniques",
+  "PSM104B": "Soft Computing Technique",
+  "PSM104C": "Digital Signal Processing",
+  "PSM104D": "Object Oriented Programming",
+
+  "PSM201": "Power System Operation and Control",
+  "PSM202": "Power System Instrumentation",
+  "PSM203": "Advanced Power System Protection",
+
+  "PSM204A": "Power System Transient",
+  "PSM204B": "Flexible AC Transmission System",
+  "PSM204C": "Advanced Electrical Drives",
+
+  "PSM205A": "Advanced Control System",
+  "PSM205B": "Modeling and Simulation of Dynamic Systems",
+  "PSM205C": "Advanced Microprocessor and Microcontroller",
+
+  "PSM291": "Laboratory III",
+  "PSM292": "Laboratory IV",
+  "PSM293": "Seminar II",
+
+  "PSM191": "Laboratory I",
+  "PSM192": "Laboratory II",
+  "PSM193": "Seminar I",
+
+  "EMM301": "Introduction to Management",
+
+  "PSM301A": "Non-conventional Energy",
+  "PSM301B": "Power System Harmonics",
+  "PSM301C": "Energy Management and Audit",
+
+  "PSM391": "Pre-submission Defense of Dissertation",
+  "PSM392": "Dissertation (Part I)",
+
+  "PSM491": "Dissertation (Completion)",
+  "PSM492": "Post Submission Defense of Dissertation",
+  "PSM494": "Comprehensive Viva-Voce",
+
+  "PGIT101": "Advanced Engineering Mathematics",
+  "PGIT102": "Real Time Operating System",
+  "PGIT103": "Advanced Computer Architecture",
+  "PGIT104": "Software Engineering and CASE Tools",
+
+  "PGIT105A": "Communication Systems",
+  "PGIT105B": "Image Processing",
+  "PGIT105C": "Artificial Intelligence",
+  "PGIT105D": "VLSI Design",
+
+  "PGIT191": "Real Time Operating System Laboratory",
+  "PGIT192A": "Communication System Lab",
+  "PGIT193": "Seminar Based on Literature Survey",
+
+  "PGIT201": "Advanced DBMS",
+  "PGIT202": "Advanced Computer Network and Security",
+  "PGIT203": "Distributed Computing System",
+
+  "PGIT204A": "Web Technology",
+  "PGIT204B": "Object Oriented Systems",
+  "PGIT204C": "Cloud Cluster and Grid Computing",
+  "PGIT204D": "Data Warehousing and Data Mining",
+  "PGIT204E": "Multimedia Technology",
+
+  "PGIT205A": "Electronic Commerce Technology",
+  "PGIT205B": "Enterprise Resource Planning",
+  "PGIT205C": "Mobile Computing",
+  "PGIT205D": "Complex Systems",
+  "PGIT205E": "Design and Analysis of Algorithm",
+  "PGIT205F": "Pattern Recognition",
+  "PGIT205G": "Wireless and Mobile Communication",
+
+  "PGIT291": "Java and Web Technology Lab / Dot Net Lab / Advanced Computer Network and Security Lab",
+  "PGIT292": "Seminar Term Paper Leading to Project",
+
+  "PGIT301A": "Project Management and Entrepreneurship",
+  "PGIT301B": "Teaching and Research Methodologies",
+
+  "PGIT302A": "Supply Chain Management",
+  "PGIT302B": "Biomedical Informatics",
+  "PGIT302C": "Human Computer Interaction",
+  "PGIT302D": "Soft Computing",
+  "PGIT302E": "Bio-Informatics",
+  "PGIT302F": "E-Business and ERP",
+  "PGIT302G": "Internet and Web Technology",
+  "PGIT302H": "Advanced JAVA and Web Technology",
+
+  "PGIT391": "Project Part I (Dissertation I + Defence)",
+  "PGIT491": "Project Part II (Dissertation II + Defence)",
+  "PGIT492": "Comprehensive Viva Voice",
+
+  "MCE101": "Advanced Communication Networks",
+  "MCE102": "Wireless and Mobile Communication",
+  "MCE103": "Program Elective I",
+  "MCE104": "Program Elective II",
+  "MCE105": "Research Methodology and IPR",
+  "MCE106": "Audit Course 1",
+
+  "MCE191": "Advanced Communication Networks Lab",
+  "MCE192": "Wireless and Mobile Communication Lab",
+
+  "MCE201": "Antennas and Radiating Systems",
+  "MCE202": "Advanced Digital Signal Processing",
+  "MCE203": "Program Elective III",
+  "MCE204": "Program Elective IV",
+  "MCE205": "Audit Course 2",
+
+  "MCE291": "Antennas and Radiating Systems Lab",
+  "MCE292": "Advanced Digital Signal Processing Lab",
+  "MCE281": "Mini Project with Seminar",
+
+  "MCE301": "Program Elective V",
+  "MCE302": "Open Elective",
+
+  "MCE381": "Dissertation I",
+  "MCE481": "Dissertation II",
+
+  "PCPEM101": "Advances in Forming and Joining Processes",
+  "PCPEM102": "Theory of Machining and Grinding",
+
+  "PEPEM103A": "Advanced Engineering Mathematics",
+  "PEPEM103B": "Statistics and Probability with R",
+
+  "PEPEM104A": "Planning and Control of Production Systems",
+  "PEPEM104B": "Project Engineering and Management",
+  "PEPEM104C": "Materials Management",
+  "PEPEM104D": "Industrial Ergonomics",
+  "PEPEM104E": "Introduction to Finite Element Methods in Engineering",
+  "PEPEM104F": "Environmental Degradation of Materials",
+  "PEPEM104G": "Production and Operation Management",
+  "PEPEM104H": "Fluid Power Control Systems Design and Application",
+
+  "MCPEM105": "Research Methodology and IPR",
+
+  "ACPEM101A": "Audit Course 1",
+  "ACPEM101B": "Audit Course 1",
+  "ACPEM101C": "Audit Course 1",
+  "ACPEM101D": "Audit Course 1",
+  "ACPEM101E": "Audit Course 1",
+  "ACPEM101F": "Audit Course 1",
+  "ACPEM101G": "Audit Course 1",
+  "ACPEM101H": "Audit Course 1",
+
+  "PCPEM191": "Manufacturing Process Laboratory",
+  "PCPEM192": "Design Laboratory I",
+
+  "PCPEM201": "Automation in Manufacturing",
+  "PCPEM202": "Modern Machining Processes",
+
+  "PEPEM203A": "Machine Tools Engineering",
+  "PEPEM203B": "Micro and Precision Manufacturing",
+  "PEPEM203C": "Mechatronic Systems Design and Applications",
+  "PEPEM203D": "Safety and Occupational Health Management",
+
+  "PEPEM204A": "Quality Management",
+  "PEPEM204B": "CAD CAM Systems",
+  "PEPEM204C": "Design of Experiments",
+  "PEPEM204D": "Advanced Welding Technology",
+  "PEPEM204E": "Product Design and Development",
+  "PEPEM204F": "Computational Fluid Dynamics",
+
+  "ACPEM201A": "Audit Course 2",
+  "ACPEM201B": "Audit Course 2",
+  "ACPEM201C": "Audit Course 2",
+  "ACPEM201D": "Audit Course 2",
+  "ACPEM201E": "Audit Course 2",
+  "ACPEM201F": "Audit Course 2",
+  "ACPEM201G": "Audit Course 2",
+  "ACPEM201H": "Audit Course 2",
+
+  "PCPEM291": "Manufacturing Process and Systems Laboratory",
+  "PCPEM292": "Design Laboratory II",
+  "PWPEM281": "Mini Project with Seminar",
+
+  "PEPEM301A": "Logistics and Supply Chain Management",
+  "PEPEM301B": "Introduction to Management Information Systems",
+  "PEPEM301C": "Robotics and Robot Applications",
+  "PEPEM301D": "Tribology and Terotechnology",
+  "PEPEM301E": "Design and Manufacture of Cutting Tool Moulds and Dies",
+  "PEPEM301F": "Industrial Pollution and Waste Management",
+
+  "OEPEM302A": "Business Analytics",
+  "OEPEM302B": "Applied Operations Research",
+  "OEPEM302C": "Cost Management of Engineering Projects",
+  "OEPEM302D": "Industrial Safety",
+  "OEPEM302E": "Composite Materials",
+  "OEPEM302F": "Waste to Energy",
+  "OEPEM302G": "Automation and Control in Industrial Application",
+
+  "PWPEM381": "Dissertation I (Progress)",
+  "PWPEM481": "Dissertation II (Completion)",
+
+  "MCAN101": "Programming Concept with Python",
+  "MCAN102": "Relational Database Management System",
+  "MCAN103": "Computer Organization and Architecture",
+  "MCAN104": "Discrete Mathematics",
+
+  "MCANE105A": "Environment and Ecology",
+  "MCANE105B": "Management Accounting",
+  "MCANE105C": "Constitution of India",
+  "MCANE105D": "Stress Management through Yoga",
+  "MCANE105E": "Ethics in Business Profession",
+  "MCANE105F": "Managerial Economics",
+
+  "MCAN190": "Soft Skill and Interpersonal Communication",
+  "MCAN191": "Python Programming Lab",
+  "MCAN192": "Relational Database Management System Lab",
+
+  "MCAN201": "Data Structure with Python",
+  "MCAN202": "Operating System",
+  "MCAN203": "Object Oriented Programming with JAVA",
+  "MCAN204": "Networking",
+
+  "MCANE205A": "Numerical and Statistical Analysis",
+  "MCANE205B": "Computer Graphics",
+  "MCANE205C": "Probability and Statistics",
+  "MCANE205D": "Introduction to Cyber Security",
+  "MCANE205E": "Introduction to IoT",
+  "MCANE205F": "Automata Theory and Computational Complexity",
+
+  "MCAN291": "Data Structure Lab with Python",
+  "MCAN292": "Operating System Lab (Unix)",
+  "MCAN293": "Object Oriented Programming Lab using JAVA",
+
+  "MCAN301": "Software Engineering using UML",
+  "MCAN302": "Artificial Intelligence",
+  "MCAN303": "Design and Analysis of Algorithm",
+
+  "MCANE304A": "Image Processing",
+  "MCANE304B": "Web Enabled JAVA Programming",
+  "MCANE304C": "Cloud Computing",
+  "MCANE304D": "Web Technology using PHP",
+  "MCANE304E": "Android Application Development",
+  "MCANE304F": "Basic Data Science",
+
+  "MCANE305A": "Information Retrieval",
+  "MCANE305B": "Data Warehousing and Data Mining",
+  "MCANE305C": "Introduction to Big Data Analytics",
+  "MCANE305D": "Graph Theory",
+  "MCANE305E": "Operation Research and Optimization Techniques",
+  "MCANE305F": "Pattern Recognition",
+  "MCANE305G": "Machine Learning",
+
+  "MCANE394A": "Elective III Lab",
+  "MCANE394B": "Elective III Lab",
+  "MCANE394C": "Elective III Lab",
+  "MCANE394D": "Elective III Lab",
+  "MCANE394E": "Elective III Lab",
+  "MCANE394F": "Elective III Lab",
+
+  "MCAN381": "Minor Project and Viva Voce",
+
+  "MCANOE401": "Open Elective",
+  "MCAN481": "Comprehensive Viva Voce",
+  "MCAN482": "Major Project and Viva Voce"
 }
